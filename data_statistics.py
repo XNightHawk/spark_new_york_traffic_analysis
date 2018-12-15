@@ -552,6 +552,7 @@ results_folder = '/media/sf_dataset/stats/'
 yellow_2018 = spark.read.parquet(dataset_folder + 'yellow_tripdata_2018.parquet').sample(False, 0.01)
 yellow_2017 = spark.read.parquet(dataset_folder + 'yellow_tripdata_2017.parquet')#.sample(False, 0.01)
 
+
 yellow_2018 = schema_conversion.v3_yellow_to_common(yellow_2018)
 yellow_2017 = schema_conversion.v3_yellow_to_common(yellow_2017)
 

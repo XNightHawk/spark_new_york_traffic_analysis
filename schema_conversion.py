@@ -13,12 +13,6 @@ from schema import *
 from pyspark.sql.types import *
 from configuration import spark
 
-def check_lat_long_validity_local(input_lat, input_lon):
-    if (input_lon is not None) and (input_lat is not None) and (input_lon > -180 and input_lon < 180) and (input_lat > -90 and input_lat < 90):
-        return True
-    else:
-        return False
-
 def check_x_y_validity_local(x, y, minx_global, miny_global, maxx_global, maxy_global):
     if (x is not None) and (y is not None) and (minx_global <= x <= maxx_global) and (miny_global <= y <= maxy_global):
         return True
@@ -26,52 +20,46 @@ def check_x_y_validity_local(x, y, minx_global, miny_global, maxx_global, maxy_g
         return False
 
 #Helper function  during the creation of the lookup matrix
-def lat_long_2_shape(input_lat, input_lon, shape_matrix, dx, dy, minx_global, miny_global, maxx_global, maxy_global, in_proj, out_proj):
+#Directly uses transformed coordinates x and y
+def lat_long_2_shape(x, y, shape_matrix, dx, dy, minx_global, miny_global, maxx_global, maxy_global):
     not_found = None
 
-    if check_lat_long_validity_local(input_lat, input_lon):
+    if check_x_y_validity_local(x, y, minx_global, miny_global, maxx_global, maxy_global):
+        x_index = int((x - minx_global) / dx)
+        if (x == maxx_global):
+            x_index -= 1
+        y_index = int((y - miny_global) / dy)
+        if (y == maxy_global):
+            y_index -= 1
 
-        # the points input_lon and input_lat in the coordinate system defined by inProj are transformed
-        # to x, y in the coordinate system defined by outProj
-        x, y = pyproj.transform(in_proj, out_proj, input_lon, input_lat)
+        target_point = (x, y)
 
-        if check_x_y_validity_local(x, y, minx_global, miny_global, maxx_global, maxy_global):
-            x_index = int((x - minx_global) / dx)
-            if (x == maxx_global):
-                x_index -= 1
-            y_index = int((y - miny_global) / dy)
-            if (y == maxy_global):
-                y_index -= 1
-
-            target_point = (x, y)
-
-            target_shape = shape_matrix.value[x_index][y_index]
-            if(target_shape is None):
-                return not_found
-            elif(len(target_shape) == 1):
-                return target_shape[0]
-            else:
-                point = shapely.geometry.Point(target_point)
-
-                for shapefile_record in target_shape:
-
-                    # Use Shapely to create the polygon
-                    shape = shapely.geometry.asShape(shapefile_record['geometry'])
-
-                    # Alternative: if point.within(shape)
-                    if shape.contains(point):
-                        return shapefile_record
-
-                # If the point does not belong to any of the zones
-                return not_found
+        target_shape = shape_matrix[x_index][y_index]
+        if(target_shape is None):
+            return not_found
+        elif(len(target_shape) == 1):
+            return target_shape[0]
         else:
-            # If the point (x, y) is not within boundaries
+            point = shapely.geometry.Point(target_point)
+
+            for shapefile_record in target_shape:
+
+                # Use Shapely to create the polygon
+                shape = shapely.geometry.asShape(shapefile_record['geometry'])
+
+                # Alternative: if point.within(shape)
+                if shape.contains(point):
+                    return shapefile_record
+
+            # If the point does not belong to any of the zones
             return not_found
     else:
-        # If the latitude or longitude are not valid values
+        # If the point (x, y) is not within boundaries
         return not_found
 
+
 def initialize_lookup_matrix(zones_shapes, num_tiles, probing_density):
+
     minx_global, miny_global, maxx_global, maxy_global = zones_shapes.bounds
 
     # Width of each tile
@@ -119,6 +107,7 @@ def initialize_lookup_matrix(zones_shapes, num_tiles, probing_density):
     #Creates a refined
     matrix = np.full((num_tiles, num_tiles), None)
     for i in range(num_tiles):
+        print(i)
         for j in range(num_tiles):
             matrix_element = base_matrix[i][j]
             if matrix_element is None:
@@ -128,7 +117,9 @@ def initialize_lookup_matrix(zones_shapes, num_tiles, probing_density):
             else:
                 new_matrix_elements = []
                 for current_probe in probe_points:
-                    probe_shape = lat_long_2_shape(current_probe[0], current_probe[1], matrix, dx, dy, minx_global, miny_global, maxx_global, maxy_global, in_proj, out_proj)
+
+                    probe_shape = lat_long_2_shape(current_probe[0] + minx_global + i * dx, current_probe[1] + miny_global + j * dy, base_matrix, dx, dy, minx_global, miny_global, maxx_global, maxy_global)
+
                     if (not (probe_shape is None)) and probe_shape not in new_matrix_elements:
                         new_matrix_elements.append(probe_shape)
                 #If no shapes are found leave null instead of the empty list
@@ -147,8 +138,8 @@ filename = 'docs/taxi_zones/taxi_zones.shp'
 # Open a file for reading
 taxi_zones_shapes = fiona.open(filename)
 
-num_tiles = 4
-probing_density = 300
+num_tiles = 100
+probing_density = 3
 
 #Initialize coordinate conversion lookup matrix
 matrix, dx, dy, minx_global, miny_global, maxx_global, maxy_global, in_proj, out_proj = initialize_lookup_matrix(taxi_zones_shapes, num_tiles, probing_density)

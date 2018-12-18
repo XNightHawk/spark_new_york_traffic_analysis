@@ -12,7 +12,8 @@ for i in range(schema_conversion.num_tiles):
         if schema_conversion.matrix[i][j]:
             print(str(len(schema_conversion.matrix[i][j])))
         else:
-            print(str(0))
+            pass
+            #print(str(0))
 
 '''
 dataset_folder = '/media/luca/TOSHIBA EXT/BigData/datasets/'

@@ -1,10 +1,20 @@
 '''
 Code for coordinate conversion exploration
 '''
+import schema_conversion
 
-from configuration import spark
 from schema_conversion import *
 
+print(schema_conversion.matrix)
+
+for i in range(schema_conversion.num_tiles):
+    for j in range(schema_conversion.num_tiles):
+        if schema_conversion.matrix[i][j]:
+            print(str(len(schema_conversion.matrix[i][j])))
+        else:
+            print(str(0))
+
+'''
 dataset_folder = '/media/luca/TOSHIBA EXT/BigData/datasets/'
 results_folder = '/media/luca/TOSHIBA EXT/BigData/datasets/stats/'
 
@@ -34,3 +44,4 @@ green_2015.write.save(results_folder + 'green_2015.parquet')
 #spark.sql("select count(*) as num_of_yellow_2017 from parquet.`/media/luca/TOSHIBA EXT/BigData/datasets/yellow_tripdata_2017.parquet`").show()
 #spark.sql("select count(*) as num_of_yellow_2018 from parquet.`/media/luca/TOSHIBA EXT/BigData/datasets/yellow_tripdata_2018.parquet`").show()
 
+'''

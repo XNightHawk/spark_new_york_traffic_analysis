@@ -1,8 +1,13 @@
+import pyspark
 from pyspark.sql import SparkSession
 
 appName = 'Parquet Converter'
-master = 'local[*]'
 
-# Create a SparkSession. No need to create SparkContext
-# You automatically get it as part of the SparkSession
+conf = pyspark.SparkConf()
+conf.set("spark.executor.memory", '1g')
+conf.set('spark.executor.cores', '1')
+conf.setMaster("local[1]")
+
+sc = pyspark.SparkContext(conf=conf)
 spark = SparkSession.builder.appName(appName).getOrCreate()
+

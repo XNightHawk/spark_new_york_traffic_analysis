@@ -3,6 +3,7 @@ Conversion utilities to common schema format
 '''
 
 import os
+import random
 
 import pyspark
 from pyspark.sql.functions import col
@@ -13,7 +14,8 @@ import fiona
 import pyproj
 from schema import *
 from pyspark.sql.types import *
-from configuration import spark
+import configuration
+#from configuration import spark
 
 def check_x_y_validity_local(x, y, minx_global, miny_global, maxx_global, maxy_global):
     if (x is not None) and (y is not None) and (minx_global <= x <= maxx_global) and (miny_global <= y <= maxy_global):
@@ -78,6 +80,7 @@ def initialize_lookup_matrix(zones_shapes, num_tiles, probing_density, save_loca
     if load_location and os.path.isfile(load_location):
         print("Loading lookup matrix")
         matrix = np.load(load_location)
+        print("Lookup matrix loaded")
         return (matrix, dx, dy, minx_global, miny_global, maxx_global, maxy_global, in_proj, out_proj)
 
     # Create a num_tiles * num_tiles matrix of None elements
@@ -136,14 +139,15 @@ def initialize_lookup_matrix(zones_shapes, num_tiles, probing_density, save_loca
                 if len(new_matrix_elements) > 0:
                     matrix[i][j] = new_matrix_elements
 
+    print("Lookup matrix built")
     if save_location:
         np.save(save_location, matrix)
 
     return (matrix, dx, dy, minx_global, miny_global, maxx_global, maxy_global, in_proj, out_proj)
 
 def initialize_stripped_lookup_matrix(matrix):
-    matrix = np.matrix([1])
 
+    print("Stripping lookup matrix")
     rows, columns = matrix.shape
 
     #Initialize each element to the unassigned element
@@ -154,9 +158,10 @@ def initialize_stripped_lookup_matrix(matrix):
             current_zones = matrix[i][j]
             #Check that it is not null and that it has at least one element
             if current_zones:
-                current_zones.shuffle() #get a random zone between the possible ones
+                random.shuffle(current_zones) #get a random zone between the possible ones
                 stripped_matrix[i][j] = current_zones[0]['properties']['LocationID']
 
+    print("Lookup matrix stripped")
     return stripped_matrix
 
 
@@ -178,14 +183,14 @@ matrix, dx, dy, minx_global, miny_global, maxx_global, maxy_global, in_proj, out
 stripped_matrix = initialize_stripped_lookup_matrix(matrix)
 
 #Initialize broadcast variables
-matrix_bc = spark.sparkContext.broadcast(matrix)
-stripped_matrix_bc = spark.sparkContext.broadcast(stripped_matrix)
-minx_global_bc = spark.sparkContext.broadcast(minx_global)
-miny_global_bc = spark.sparkContext.broadcast(miny_global)
-maxx_global_bc = spark.sparkContext.broadcast(maxx_global)
-maxy_global_bc = spark.sparkContext.broadcast(maxy_global)
-dx_bc = spark.sparkContext.broadcast(dx)
-dy_bc = spark.sparkContext.broadcast(dy)
+matrix_bc = configuration.spark.sparkContext.broadcast(matrix)
+stripped_matrix_bc = configuration.spark.sparkContext.broadcast(stripped_matrix)
+minx_global_bc = configuration.spark.sparkContext.broadcast(minx_global)
+miny_global_bc = configuration.spark.sparkContext.broadcast(miny_global)
+maxx_global_bc = configuration.spark.sparkContext.broadcast(maxx_global)
+maxy_global_bc = configuration.spark.sparkContext.broadcast(maxy_global)
+dx_bc = configuration.spark.sparkContext.broadcast(dx)
+dy_bc = configuration.spark.sparkContext.broadcast(dy)
 
 def check_lat_long_validity(input_lat, input_lon):
     if (input_lon is not None) and (input_lat is not None) and (input_lon > -180 and input_lon < 180) and (input_lat > -90 and input_lat < 90):
@@ -199,7 +204,8 @@ def check_x_y_validity(x, y):
     else:
         return False
 
-counter = 0
+#counter = 0
+#not_f = 0
 
 #Hi performance approximate version of zone association routine
 #Associates ech coordinate with a zone
@@ -209,9 +215,12 @@ def lat_long_2_location_ID_hi_perf(input_lat, input_lon):
 
     not_found = -1
 
-    global counter
-    counter = counter + 1
-    print(counter)
+    #global counter
+    #global not_f
+    #counter = counter + 1
+    #if(counter % 10000 == 0):
+    #    print(counter)
+    #    print(not_f)
 
     if (input_lon is not None) and (input_lat is not None) and (input_lon > -180 and input_lon < 180) and (input_lat > -90 and input_lat < 90):
 
@@ -219,27 +228,26 @@ def lat_long_2_location_ID_hi_perf(input_lat, input_lon):
         # to x, y in the coordinate system defined by outProj
         x, y = pyproj.transform(in_proj, out_proj, input_lon, input_lat)
 
-        if (x is not None) and (y is not None) and (minx_global_bc.value <= x <= maxx_global_bc.value) and (miny_global_bc.value <= y <= maxy_global_bc.value):
+        if (x is not None) and (y is not None) and (minx_global_bc.value <= x < maxx_global_bc.value) and (miny_global_bc.value <= y < maxy_global_bc.value):
+
             matrix_rows, matrix_columns = stripped_matrix_bc.value.shape
             x_index = int((x - minx_global_bc.value) / dx_bc.value)
-            if (x_index >= matrix_rows):
-                x_index = matrix_rows - 1
+            #We ensured coord is strictly less than maximum, so it should never go outside bounds
+            #if (x_index >= matrix_rows):
+            #    x_index = matrix_rows - 1
             y_index = int((y - miny_global_bc.value) / dy_bc.value)
-            if (x_index >= matrix_columns):
-                y_index = matrix_columns - 1
+            #if (x_index >= matrix_columns):
+            #    y_index = matrix_columns - 1
 
-            return stripped_matrix_bc.value[x_index][y_index]
+            return int(stripped_matrix_bc.value[x_index][y_index])
 
+    #not_f = not_f + 1
     return not_found
 
 # convert from our geographic coordinate system WGS84 to a New York projected coordinate system EPSG code 2263
 # and get the location ID of the specified point
 def lat_long_2_location_ID(input_lat, input_lon):
     not_found = -1
-
-    global counter
-    counter = counter + 1
-    print(counter)
 
     if check_lat_long_validity(input_lat, input_lon):
 
@@ -292,8 +300,8 @@ def v1_yellow_to_common(dataset):
         lit("yellow").alias(taxi_company_property),
         col("lpep_pickup_datetime".lower()).alias(pickup_datetime_property),
         col("lpep_dropoff_datetime".lower()).alias(dropoff_datetime_property),
-        get_location_ID_udf("pickup_latitude", "pickup_longitude").alias(pickup_location_id_property),
-        get_location_ID_udf("dropoff_latitude", "dropoff_longitude").alias(dropoff_location_id_property),
+        get_location_ID_hi_perf_udf("pickup_latitude", "pickup_longitude").alias(pickup_location_id_property),
+        get_location_ID_hi_perf_udf("dropoff_latitude", "dropoff_longitude").alias(dropoff_location_id_property),
         col("Passenger_count".lower()).alias(passenger_count_property),
         col("Trip_distance".lower()).alias(trip_distance_property),
         col("Store_and_fwd_flag".lower()).alias(store_and_forward_flag_property),
@@ -316,8 +324,8 @@ def v2_yellow_to_common(dataset):
         lit("yellow").alias(taxi_company_property),
         col("lpep_pickup_datetime".lower()).alias(pickup_datetime_property),
         col("lpep_dropoff_datetime".lower()).alias(dropoff_datetime_property),
-        get_location_ID_udf("pickup_latitude", "pickup_longitude").alias(pickup_location_id_property),
-        get_location_ID_udf("dropoff_latitude", "dropoff_longitude").alias(dropoff_location_id_property),
+        get_location_ID_hi_perf_udf("pickup_latitude", "pickup_longitude").alias(pickup_location_id_property),
+        get_location_ID_hi_perf_udf("dropoff_latitude", "dropoff_longitude").alias(dropoff_location_id_property),
         col("Passenger_count".lower()).alias(passenger_count_property),
         col("Trip_distance".lower()).alias(trip_distance_property),
         col("Store_and_fwd_flag".lower()).alias(store_and_forward_flag_property),
@@ -364,8 +372,8 @@ def v1_green_to_common(dataset):
         lit("green").alias(taxi_company_property),
         col("lpep_pickup_datetime".lower()).alias(pickup_datetime_property),
         col("lpep_dropoff_datetime".lower()).alias(dropoff_datetime_property),
-        get_location_ID_udf("Pickup_latitude", "Pickup_longitude").alias(pickup_location_id_property),
-        get_location_ID_udf("Dropoff_latitude", "Dropoff_longitude").alias(dropoff_location_id_property),
+        get_location_ID_hi_perf_udf("Pickup_latitude", "Pickup_longitude").alias(pickup_location_id_property),
+        get_location_ID_hi_perf_udf("Dropoff_latitude", "Dropoff_longitude").alias(dropoff_location_id_property),
         col("Passenger_count".lower()).alias(passenger_count_property),
         col("Trip_distance".lower()).alias(trip_distance_property),
         col("Store_and_fwd_flag".lower()).alias(store_and_forward_flag_property),
@@ -388,8 +396,8 @@ def v2_green_to_common(dataset):
         lit("green").alias(taxi_company_property),
         col("lpep_pickup_datetime".lower()).alias(pickup_datetime_property),
         col("lpep_dropoff_datetime".lower()).alias(dropoff_datetime_property),
-        get_location_ID_udf("Pickup_latitude", "Pickup_longitude").alias(pickup_location_id_property),
-        get_location_ID_udf("Dropoff_latitude", "Dropoff_longitude").alias(dropoff_location_id_property),
+        get_location_ID_hi_perf_udf("Pickup_latitude", "Pickup_longitude").alias(pickup_location_id_property),
+        get_location_ID_hi_perf_udf("Dropoff_latitude", "Dropoff_longitude").alias(dropoff_location_id_property),
         col("Passenger_count".lower()).alias(passenger_count_property),
         col("Trip_distance".lower()).alias(trip_distance_property),
         col("Store_and_fwd_flag".lower()).alias(store_and_forward_flag_property),

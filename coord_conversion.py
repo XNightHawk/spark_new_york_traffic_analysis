@@ -1,13 +1,14 @@
 '''
 Code for coordinate conversion exploration
 '''
-import schema_conversion
 
-from schema_conversion import *
+import schema_conversion
 
 
 dataset_folder = '/home/bigdata/auxiliary/'
 results_folder = '/home/bigdata/auxiliary/'
+
+print("Beore reading")
 
 #green_2015 = spark.read.parquet(dataset_folder + 'green_tripdata_2015.parquet')
 #green_2015 = v2_green_to_common(green_2015)
@@ -17,9 +18,12 @@ results_folder = '/home/bigdata/auxiliary/'
 #green_2016 = v2_green_to_common(green_2016)
 #green_2016.write.save(results_folder + 'green_2016.parquet')
 
-yellow_2016 = spark.read.parquet(dataset_folder + 'yellow_tripdata_2016.parquet')
-yellow_2016 = v2_yellow_to_common(yellow_2016)
+yellow_2016 = schema_conversion.configuration.spark.read.parquet(dataset_folder + 'yellow_tripdata_2016.parquet')
+print("Read dataset")
+yellow_2016 = schema_conversion.v2_yellow_to_common(yellow_2016)
+print("Command to convert")
 yellow_2016.write.parquet(results_folder + 'yellow_tripdata_2016_common.parquet')
+print("Converted")
 
 #spark.sql("select count(*) as num_of_green_2013 from parquet.`/media/luca/TOSHIBA EXT/BigData/datasets/green_tripdata_2013.parquet`").show()
 #spark.sql("select count(*) as num_of_green_2014 from parquet.`/media/luca/TOSHIBA EXT/BigData/datasets/green_tripdata_2014.parquet`").show()

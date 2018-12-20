@@ -199,6 +199,8 @@ maxx_global_bc = spark.sparkContext.broadcast(maxx_global)
 maxy_global_bc = spark.sparkContext.broadcast(maxy_global)
 dx_bc = spark.sparkContext.broadcast(dx)
 dy_bc = spark.sparkContext.broadcast(dy)
+in_proj_bc = spark.sparkContext.broadcast(in_proj)
+out_proj_bc = spark.sparkContext.broadcast(out_proj)
 
 
 def check_lat_long_validity(input_lat, input_lon):
@@ -213,8 +215,8 @@ def check_x_y_validity(x, y):
     else:
         return False
 
-#counter = 0
-#not_f = 0
+counter = 0
+not_f = 0
 
 #Hi performance approximate version of zone association routine
 #Associates ech coordinate with a zone
@@ -222,21 +224,39 @@ def lat_long_2_location_ID_hi_perf(input_lat, input_lon):
     #Importing module locally avoids its serialization
     import pyproj
 
+    # setup our projections
+    in_proj = pyproj.Proj("+init=EPSG:4326")  # WGS84
+    out_proj = pyproj.Proj("+init=EPSG:2263", preserve_units=True)  # http://prj2epsg.org/epsg/2263
+
+    #in_proj = in_proj_bc.value
+    #out_proj = out_proj_bc.value
+
     not_found = -1
 
-    #global counter
-    #global not_f
-    #counter = counter + 1
-    #if(counter % 10000 == 0):
-    #    print(counter)
-    #    print(not_f)
+    global counter
+    global not_f
+    counter = counter + 1
+    if(counter % 10000 == 0):
+        print(counter)
+        print(not_f)
 
+
+    #print("Converting:")
+    #print(input_lat)
+    #print(input_lon)
     if (input_lon is not None) and (input_lat is not None) and (input_lon > -180 and input_lon < 180) and (input_lat > -90 and input_lat < 90):
 
         # the points input_lon and input_lat in the coordinate system defined by inProj are transformed
         # to x, y in the coordinate system defined by outProj
         x, y = pyproj.transform(in_proj, out_proj, input_lon, input_lat)
 
+        #print("Converted x y")
+        #print(x)
+        #print(y)
+        #print(minx_global)
+        #print(maxx_global)
+        #print(miny_global)
+        #print(maxy_global)
         if (x is not None) and (y is not None) and (minx_global_bc.value <= x < maxx_global_bc.value) and (miny_global_bc.value <= y < maxy_global_bc.value):
 
             matrix_rows, matrix_columns = stripped_matrix_bc.value.shape
@@ -248,9 +268,16 @@ def lat_long_2_location_ID_hi_perf(input_lat, input_lon):
             #if (x_index >= matrix_columns):
             #    y_index = matrix_columns - 1
 
-            return int(stripped_matrix_bc.value[x_index][y_index])
+           # print("current indexes")
+            #print(x_index)
+            #print(y_index)
+            result = int(stripped_matrix_bc.value[x_index][y_index])
+            if result == -1:
+                not_f = not_f + 1
+            return result
 
-    #not_f = not_f + 1
+    #print("Wtf")
+    not_f = not_f + 1
     return not_found
 
 # convert from our geographic coordinate system WGS84 to a New York projected coordinate system EPSG code 2263
@@ -307,9 +334,10 @@ dataset_folder = '/home/bigdata/auxiliary/'
 results_folder = '/home/bigdata/auxiliary/'
 conversion_folder = '/home/bigdata/auxiliary/'
 
+
 #Build an entry for each archive to treat attaching the relative schema to each one
 archives = []
-for year in range(2014, 2017):
+for year in range(2016, 2017):
     if year <= 2014:
         #archives += [('green_tripdata_' + str(year), v1_green_to_common)]
         archives += [('yellow_tripdata_' + str(year), schema_conversion.v1_yellow_to_common)]

@@ -329,6 +329,9 @@ def lat_long_2_location_ID(input_lat, input_lon):
 
 get_location_ID_udf = pyspark.sql.functions.udf(lambda lat, long: lat_long_2_location_ID(lat, long), IntegerType())
 get_location_ID_hi_perf_udf = pyspark.sql.functions.udf(lat_long_2_location_ID_hi_perf, IntegerType())
+vendor_id_string_2_id_udf = pyspark.sql.functions.udf(schema_conversion.vendor_string_2_id, IntegerType())
+payment_type_string_2_id_udf = pyspark.sql.functions.udf(schema_conversion.payment_type_string_2_id, IntegerType())
+
 
 dataset_folder = '/home/bigdata/auxiliary/'
 results_folder = '/home/bigdata/auxiliary/'
@@ -337,7 +340,7 @@ conversion_folder = '/home/bigdata/auxiliary/'
 
 #Build an entry for each archive to treat attaching the relative schema to each one
 archives = []
-for year in range(2016, 2017):
+for year in range(2013, 2014):
     if year <= 2014:
         #archives += [('green_tripdata_' + str(year), v1_green_to_common)]
         archives += [('yellow_tripdata_' + str(year), schema_conversion.v1_yellow_to_common)]
@@ -355,6 +358,6 @@ for archive in archives:
     print("Reading: " + archive[0])
     dataset = spark.read.parquet('file://' + conversion_folder + archive[0] + '.parquet')
     #dataset = dataset.sample(0.00001)
-    converted_dataset = archive[1](dataset, get_location_ID_hi_perf_udf)
+    converted_dataset = archive[1](dataset, get_location_ID_hi_perf_udf, vendor_id_string_2_id_udf, payment_type_string_2_id_udf)
     print("Converting: " + archive[0])
     converted_dataset.write.save(conversion_folder + archive[0] + '_common.parquet')

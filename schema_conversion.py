@@ -17,9 +17,43 @@ from pyspark.sql.types import *
 
 import configuration
 
-def v1_yellow_to_common(dataset, conversion_udf):
+def payment_type_string_2_id(payment_type_string):
+
+    if payment_type_string is None:
+        return None
+
+    payment_type_string = payment_type_string.lower()
+
+    if payment_type_string == "crd":
+        return 1
+    elif payment_type_string == "csh":
+        return 2
+    elif payment_type_string == "unk":
+        return 5
+    elif payment_type_string == "noc":
+        return 3
+    elif payment_type_string == "dis":
+        return 4
+    else:
+        return None
+
+def vendor_string_2_id(vendor_string):
+
+    if vendor_string is None:
+        return None
+
+    vendor_string = vendor_string.lower()
+
+    if vendor_string == "cmt":
+        return 1
+    elif vendor_string == "vts":
+        return 2
+    else:
+        return None
+
+def v1_yellow_to_common(dataset, conversion_udf, vendor_conversion_udf, payment_type_conversion_udf):
     dataset = dataset.select(
-        col("VendorID".lower()).alias(vendor_id_property),
+        vendor_conversion_udf("VendorID".lower()).alias(vendor_id_property),
         lit("yellow").alias(taxi_company_property),
         col("lpep_pickup_datetime".lower()).alias(pickup_datetime_property),
         col("lpep_dropoff_datetime".lower()).alias(dropoff_datetime_property),
@@ -36,14 +70,14 @@ def v1_yellow_to_common(dataset, conversion_udf):
         col("improvement_surcharge".lower()).alias(improvement_surcharge_property),
         lit(0).alias(extra_property),
         col("Tip_amount".lower()).alias(tip_amount_property),
-        col("Payment_type".lower()).alias(payment_type_property)
+        payment_type_conversion_udf("Payment_type".lower()).alias(payment_type_property)
     )
 
     return dataset
 
-def v2_yellow_to_common(dataset, conversion_udf):
+def v2_yellow_to_common(dataset, conversion_udf, vendor_conversion_udf, payment_type_conversion_udf):
     dataset = dataset.select(
-        col("VendorID".lower()).alias(vendor_id_property),
+        vendor_conversion_udf("VendorID".lower()).alias(vendor_id_property),
         lit("yellow").alias(taxi_company_property),
         col("lpep_pickup_datetime".lower()).alias(pickup_datetime_property),
         col("lpep_dropoff_datetime".lower()).alias(dropoff_datetime_property),
@@ -60,12 +94,12 @@ def v2_yellow_to_common(dataset, conversion_udf):
         col("improvement_surcharge".lower()).alias(improvement_surcharge_property),
         col("Extra".lower()).alias(extra_property),
         col("Tip_amount".lower()).alias(tip_amount_property),
-        col("Payment_type".lower()).alias(payment_type_property)
+        payment_type_conversion_udf("Payment_type".lower()).alias(payment_type_property)
     )
 
     return dataset
 
-def v3_yellow_to_common(dataset, conversion_udf):
+def v3_yellow_to_common(dataset, conversion_udf, vendor_conversion_udf, payment_type_conversion_udf):
     dataset = dataset.select(
         col("VendorID".lower()).alias(vendor_id_property),
         lit("yellow").alias(taxi_company_property),
@@ -89,9 +123,9 @@ def v3_yellow_to_common(dataset, conversion_udf):
 
     return dataset
 
-def v1_green_to_common(dataset, conversion_udf):
+def v1_green_to_common(dataset, conversion_udf, vendor_conversion_udf, payment_type_conversion_udf):
     dataset = dataset.select(
-        col("VendorID".lower()).alias(vendor_id_property),
+        vendor_conversion_udf("VendorID".lower()).alias(vendor_id_property),
         lit("green").alias(taxi_company_property),
         col("lpep_pickup_datetime".lower()).alias(pickup_datetime_property),
         col("lpep_dropoff_datetime".lower()).alias(dropoff_datetime_property),
@@ -108,14 +142,14 @@ def v1_green_to_common(dataset, conversion_udf):
         lit(0).alias(improvement_surcharge_property),
         col("Extra".lower()).alias(extra_property),
         col("Tip_amount".lower()).alias(tip_amount_property),
-        col("Payment_type".lower()).alias(payment_type_property)
+        payment_type_conversion_udf("Payment_type".lower()).alias(payment_type_property)
     )
 
     return dataset
 
-def v2_green_to_common(dataset, conversion_udf):
+def v2_green_to_common(dataset, conversion_udf, vendor_conversion_udf, payment_type_conversion_udf):
     dataset = dataset.select(
-        col("VendorID".lower()).alias(vendor_id_property),
+        vendor_conversion_udf("VendorID".lower()).alias(vendor_id_property),
         lit("green").alias(taxi_company_property),
         col("lpep_pickup_datetime".lower()).alias(pickup_datetime_property),
         col("lpep_dropoff_datetime".lower()).alias(dropoff_datetime_property),
@@ -132,12 +166,12 @@ def v2_green_to_common(dataset, conversion_udf):
         col("improvement_surcharge".lower()).alias(improvement_surcharge_property),
         col("Extra".lower()).alias(extra_property),
         col("Tip_amount".lower()).alias(tip_amount_property),
-        col("Payment_type".lower()).alias(payment_type_property)
+        payment_type_conversion_udf("Payment_type".lower()).alias(payment_type_property)
     )
 
     return dataset
 
-def v3_green_to_common(dataset, conversion_udf):
+def v3_green_to_common(dataset, conversion_udf, vendor_conversion_udf, payment_type_conversion_udf):
     dataset = dataset.select(
         col("VendorID".lower()).alias(vendor_id_property),
         lit("green").alias(taxi_company_property),

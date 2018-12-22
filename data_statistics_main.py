@@ -1,3 +1,7 @@
+'''
+Statistical data analysis routines
+'''
+
 import pyspark
 from pyspark.sql import SparkSession
 import pyspark.sql.functions

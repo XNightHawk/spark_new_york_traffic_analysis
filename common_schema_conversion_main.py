@@ -1,5 +1,5 @@
 '''
-Code for coordinate conversion exploration
+Converts parquet files in the original schema to parquet files with the common schema
 '''
 
 import os
@@ -15,15 +15,14 @@ import pyspark
 from pyspark.sql import SparkSession
 from pyspark.sql.types import *
 
-appName = 'Parquet Converter'
-
 def check_x_y_validity_local(x, y, minx_global, miny_global, maxx_global, maxy_global):
     if (x is not None) and (y is not None) and (minx_global <= x <= maxx_global) and (miny_global <= y <= maxy_global):
         return True
     else:
         return False
 
-#Helper function  during the creation of the lookup matrix
+#Helper function for the creation of the lookup matrix.
+#Associates coordinates to a location using a lookup matrix
 #Directly uses transformed coordinates x and y
 def lat_long_2_shape(x, y, shape_matrix, dx, dy, minx_global, miny_global, maxx_global, maxy_global):
     not_found = None
@@ -61,7 +60,9 @@ def lat_long_2_shape(x, y, shape_matrix, dx, dy, minx_global, miny_global, maxx_
         # If the point (x, y) is not within boundaries
         return not_found
 
-
+#Creates a refined lookup matrix for coordinates conversion to locations
+#Accepts a shapefile, the number of cells in each dimension of the matrix, a density for probing points and a location
+#where to save or load the created matrix for better performance
 def initialize_lookup_matrix(zones_shapes, num_tiles, probing_density, save_location='', load_location=''):
 
     minx_global, miny_global, maxx_global, maxy_global = zones_shapes.bounds
@@ -84,9 +85,7 @@ def initialize_lookup_matrix(zones_shapes, num_tiles, probing_density, save_loca
         return (matrix, dx, dy, minx_global, miny_global, maxx_global, maxy_global, in_proj, out_proj)
 
     # Create a num_tiles * num_tiles matrix of None elements
-    # Alternative: nonelist = [None] * num_tiles * num_tiles
-    # matrix = np.array(nonelist)
-    # matrix = np.reshape(matrix, (num_tiles, num_tiles))
+    # It is a non refined matrix used to speed up probing operations
     base_matrix = np.full((num_tiles, num_tiles), None)
 
     # Populate matrix
@@ -109,6 +108,7 @@ def initialize_lookup_matrix(zones_shapes, num_tiles, probing_density, save_loca
                     base_matrix[i][j] = []
                 base_matrix[i][j].append(shapefile_record)
 
+    #Initialize probe points according to probing density
     probe_points = []
     probe_points += [(0, 0), (dx, 0), (0, dy), (dx, dy)]
     for i in range(1, probing_density):
@@ -117,16 +117,20 @@ def initialize_lookup_matrix(zones_shapes, num_tiles, probing_density, save_loca
 
     print("Building lookup matrix")
 
-    #Creates a refined
+    #Creates a refined lookup matrix starting from the non refined one
     matrix = np.full((num_tiles, num_tiles), None)
     for i in range(num_tiles):
         print("Processing row " + str(i))
         for j in range(num_tiles):
             matrix_element = base_matrix[i][j]
+
+            #If no elements or exactly one are present, there is nothing to do
             if matrix_element is None:
                 pass
             elif len(matrix_element) == 1:
                 matrix[i][j] = matrix_element
+            #If there are many possible locations, then use probing points to determine the ones that
+            #are effectively in the current cell
             else:
                 new_matrix_elements = []
                 for current_probe in probe_points:
@@ -145,6 +149,7 @@ def initialize_lookup_matrix(zones_shapes, num_tiles, probing_density, save_loca
 
     return (matrix, dx, dy, minx_global, miny_global, maxx_global, maxy_global, in_proj, out_proj)
 
+#Builds an approximate lookup matrix that to each cell associates exactly one locaiton id, -1 if no zone is present
 def initialize_stripped_lookup_matrix(matrix):
 
     print("Stripping lookup matrix")
@@ -164,17 +169,21 @@ def initialize_stripped_lookup_matrix(matrix):
     print("Lookup matrix stripped")
     return stripped_matrix
 
+
+appName = 'Parquet Common Schema Converter'
+
+#Please also ensure that Spark driver memory is set in the configuration files
+#to a sufficient amount (>= 2g)
 conf = pyspark.SparkConf()
 conf.set("spark.executor.memory", '1g')
 conf.set('spark.executor.cores', '1')
-conf.setMaster("local[2]")
+conf.setMaster("local[*]")
 
 sc = pyspark.SparkContext(conf=conf)
 spark = SparkSession.builder.appName(appName).getOrCreate()
 
 #Reads shapefile
 shapefile_path = 'docs/taxi_zones/taxi_zones.shp'
-
 taxi_zones_shapes = fiona.open(shapefile_path)
 
 #Number of rows and columns in the lookup matrix
@@ -215,149 +224,67 @@ def check_x_y_validity(x, y):
     else:
         return False
 
-counter = 0
-not_f = 0
-
 #Hi performance approximate version of zone association routine
 #Associates ech coordinate with a zone
 def lat_long_2_location_ID_hi_perf(input_lat, input_lon):
     #Importing module locally avoids its serialization
     import pyproj
 
-    # setup our projections
+    # Coordinate conversion objects.
+    # They are not correctly serialized among workers, so they are initialized each time
     in_proj = pyproj.Proj("+init=EPSG:4326")  # WGS84
     out_proj = pyproj.Proj("+init=EPSG:2263", preserve_units=True)  # http://prj2epsg.org/epsg/2263
 
-    #in_proj = in_proj_bc.value
-    #out_proj = out_proj_bc.value
-
     not_found = -1
 
-    global counter
-    global not_f
-    counter = counter + 1
-    if(counter % 10000 == 0):
-        print(counter)
-        print(not_f)
-
-
-    #print("Converting:")
-    #print(input_lat)
-    #print(input_lon)
     if (input_lon is not None) and (input_lat is not None) and (input_lon > -180 and input_lon < 180) and (input_lat > -90 and input_lat < 90):
 
         # the points input_lon and input_lat in the coordinate system defined by inProj are transformed
         # to x, y in the coordinate system defined by outProj
         x, y = pyproj.transform(in_proj, out_proj, input_lon, input_lat)
 
-        #print("Converted x y")
-        #print(x)
-        #print(y)
-        #print(minx_global)
-        #print(maxx_global)
-        #print(miny_global)
-        #print(maxy_global)
         if (x is not None) and (y is not None) and (minx_global_bc.value <= x < maxx_global_bc.value) and (miny_global_bc.value <= y < maxy_global_bc.value):
 
             matrix_rows, matrix_columns = stripped_matrix_bc.value.shape
             x_index = int((x - minx_global_bc.value) / dx_bc.value)
-            #We ensured coord is strictly less than maximum, so it should never go outside bounds
-            #if (x_index >= matrix_rows):
-            #    x_index = matrix_rows - 1
             y_index = int((y - miny_global_bc.value) / dy_bc.value)
-            #if (x_index >= matrix_columns):
-            #    y_index = matrix_columns - 1
 
-           # print("current indexes")
-            #print(x_index)
-            #print(y_index)
             result = int(stripped_matrix_bc.value[x_index][y_index])
-            if result == -1:
-                not_f = not_f + 1
             return result
 
-    #print("Wtf")
-    not_f = not_f + 1
     return not_found
 
-# convert from our geographic coordinate system WGS84 to a New York projected coordinate system EPSG code 2263
-# and get the location ID of the specified point
-def lat_long_2_location_ID(input_lat, input_lon):
-    not_found = -1
-
-    if check_lat_long_validity(input_lat, input_lon):
-
-        # the points input_lon and input_lat in the coordinate system defined by inProj are transformed
-        # to x, y in the coordinate system defined by outProj
-        x, y = pyproj.transform(in_proj, out_proj, input_lon, input_lat)
-
-        if check_x_y_validity(x, y):
-            x_index = int((x - minx_global_bc.value) / dx_bc.value)
-            if (x == maxx_global_bc.value):
-                x_index -= 1
-            y_index = int((y - miny_global_bc.value) / dy_bc.value)
-            if (y == maxy_global_bc.value):
-                y_index -= 1
-
-            target_point = (x, y)
-
-            target_shape = matrix_bc.value[x_index][y_index]
-            if(target_shape is None):
-                return not_found
-            elif(len(target_shape) == 1):
-                return target_shape[0]['properties']['LocationID']
-            else:
-                point = shapely.geometry.Point(target_point)
-
-                for shapefile_record in target_shape:
-
-                    # Use Shapely to create the polygon
-                    shape = shapely.geometry.asShape(shapefile_record['geometry'])
-
-                    # Alternative: if point.within(shape)
-                    if shape.contains(point):
-                        return shapefile_record['properties']['LocationID']
-
-                # If the point does not belong to any of the zones
-                return not_found
-        else:
-            # If the point (x, y) is not within boundaries
-            return not_found
-    else:
-        # If the latitude or longitude are not valid values
-        return not_found
-
-get_location_ID_udf = pyspark.sql.functions.udf(lambda lat, long: lat_long_2_location_ID(lat, long), IntegerType())
 get_location_ID_hi_perf_udf = pyspark.sql.functions.udf(lat_long_2_location_ID_hi_perf, IntegerType())
 vendor_id_string_2_id_udf = pyspark.sql.functions.udf(schema_conversion.vendor_string_2_id, IntegerType())
 payment_type_string_2_id_udf = pyspark.sql.functions.udf(schema_conversion.payment_type_string_2_id, IntegerType())
-
 
 dataset_folder = '/home/bigdata/auxiliary/'
 results_folder = '/home/bigdata/auxiliary/'
 conversion_folder = '/home/bigdata/auxiliary/'
 
-
-#Build an entry for each archive to treat attaching the relative schema to each one
+#Build an entry for each archive to treat attaching the relative schema conversion routine to each one
 archives = []
-for year in range(2013, 2014):
+for year in range(2010, 2019):
     if year <= 2014:
-        #archives += [('green_tripdata_' + str(year), v1_green_to_common)]
+        if year >= 2013:
+            archives += [('green_tripdata_' + str(year), schema_conversion.v1_green_to_common)]
         archives += [('yellow_tripdata_' + str(year), schema_conversion.v1_yellow_to_common)]
 
     elif year <= 2016:
-        #archives += [('green_tripdata_' + str(year), v2_green_to_common)]
+        archives += [('green_tripdata_' + str(year), schema_conversion.v2_green_to_common)]
         archives += [('yellow_tripdata_' + str(year), schema_conversion.v2_yellow_to_common)]
 
     else:
-        #archives += [('green_tripdata_' + str(year), v3_green_to_common)]
+        archives += [('green_tripdata_' + str(year), schema_conversion.v3_green_to_common)]
         archives += [('yellow_tripdata_' + str(year), schema_conversion.v3_yellow_to_common)]
 
 #Open and convert each archive to parquet format
 for archive in archives:
     print("Reading: " + archive[0])
     dataset = spark.read.parquet('file://' + conversion_folder + archive[0] + '.parquet')
-    #dataset = dataset.sample(0.00001)
+
     converted_dataset = archive[1](dataset, get_location_ID_hi_perf_udf, vendor_id_string_2_id_udf, payment_type_string_2_id_udf)
     print("Converting: " + archive[0])
     converted_dataset.write.save(conversion_folder + archive[0] + '_common.parquet')
+
+

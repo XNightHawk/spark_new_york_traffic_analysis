@@ -18,8 +18,11 @@ conversion_folder = '/media/sf_dataset/'
 
 #Build an entry for each archive to treat attaching the relative schema to each one
 archives = []
-for year in range(2013, 2019):
-    if year <= 2014:
+for year in range(2012, 2013):
+    if year <= 2012:
+        #Only yellow data available in this period
+        archives += [('yellow_tripdata_' + str(year), v1_schema_yellow)]
+    elif year <= 2014:
         archives += [('green_tripdata_' + str(year), v1_schema_green)]
         archives += [('yellow_tripdata_' + str(year), v1_schema_yellow)]
 

@@ -3,10 +3,14 @@ Statistical data analysis routines
 '''
 
 import pyspark
+from pyspark.ml import Pipeline
 from pyspark.sql import SparkSession
 import pyspark.sql.functions
 from pyspark.sql.types import *
 from pyspark.sql.functions import *
+
+from pyspark.ml.clustering import KMeans
+from pyspark.ml.feature import OneHotEncoder, StringIndexer, VectorAssembler, StandardScaler, OneHotEncoderEstimator
 
 import schema_conversion
 from schema import *
@@ -96,9 +100,19 @@ def compute_trip_duration_distribution(dataset, result_filename, show = False):
         dataset.show()
         dataset.unpersist()
 
+def compute_trip_duration_by_pickup_hour_distribution(dataset, result_filename, show = False):
+    dataset = dataset.groupBy(trip_duration_minutes_column(dataset), hour(pickup_datetime_property)).count()
+    if show:
+        dataset.cache()
+
+    dataset.toPandas().to_csv(result_filename, header=True)
+
+    if show:
+        dataset.show()
+        dataset.unpersist()
 
 def compute_trip_distance_by_pickup_hour_distribution(dataset, result_filename, show = False):
-    dataset = dataset.groupBy(trip_duration_minutes_column(dataset), hour(pickup_datetime_property)).count()
+    dataset = dataset.groupBy(dataset[trip_distance_property].cast(IntegerType()), hour(pickup_datetime_property)).count()
     if show:
         dataset.cache()
 
@@ -296,7 +310,7 @@ def compute_fare_amount_distribution(dataset, result_filename, show=False):
 
 def compute_average_fare_amount_percentage_by_year(dataset, result_filename, show=False):
 
-    dataset = dataset.select(year(dataset[pickup_datetime_property]).alias("year"), (dataset[fare_amount_property] / dataset[total_amount_property]).alias("fare_amount_percentage")).groupBy("year").avg("fare_amount_percentage")
+    dataset = dataset.select(pyspark.sql.functions.year(dataset[pickup_datetime_property]).alias("year"), (dataset[fare_amount_property] / dataset[total_amount_property]).alias("fare_amount_percentage")).groupBy("year").avg("fare_amount_percentage")
     if show:
         dataset.cache()
 
@@ -332,7 +346,7 @@ def compute_total_amount_distribution(dataset, result_filename, show=False):
 
 def compute_profits_by_year(dataset, result_filename, show=False):
 
-    dataset = dataset.groupBy(year(dataset[pickup_datetime_property])).sum(total_amount_property)
+    dataset = dataset.groupBy(pyspark.sql.functions.year(dataset[pickup_datetime_property])).sum(total_amount_property)
     if show:
         dataset.cache()
 
@@ -343,8 +357,8 @@ def compute_profits_by_year(dataset, result_filename, show=False):
         dataset.unpersist()
 
 def compute_monthly_profit_percentage_by_year_and_month(dataset, result_filename, show=False):
-    year_profit_dataset = dataset.groupBy(year(dataset[pickup_datetime_property]).alias("year")).sum(total_amount_property)
-    month_profit_dataset = dataset.groupBy(year(dataset[pickup_datetime_property]).alias("year"), month(dataset[pickup_datetime_property]).alias("month")).sum(total_amount_property)
+    year_profit_dataset = dataset.groupBy(pyspark.sql.functions.year(dataset[pickup_datetime_property]).alias("year")).sum(total_amount_property)
+    month_profit_dataset = dataset.groupBy(pyspark.sql.functions.year(dataset[pickup_datetime_property]).alias("year"), month(dataset[pickup_datetime_property]).alias("month")).sum(total_amount_property)
 
     dataset = month_profit_dataset.join(year_profit_dataset, "year").select("year", "month", month_profit_dataset["sum(" + total_amount_property + ")"] / year_profit_dataset["sum(" + total_amount_property + ")"])
 
@@ -359,7 +373,7 @@ def compute_monthly_profit_percentage_by_year_and_month(dataset, result_filename
 
 def compute_average_total_amount_by_year(dataset, result_filename, show=False):
 
-    dataset = dataset.groupBy(year(dataset[pickup_datetime_property])).avg(total_amount_property)
+    dataset = dataset.groupBy(pyspark.sql.functions.year(dataset[pickup_datetime_property])).avg(total_amount_property)
     if show:
         dataset.cache()
 
@@ -383,7 +397,7 @@ def compute_average_total_amount_by_month(dataset, result_filename, show=False):
 
 def compute_mta_tax_profits_by_year(dataset, result_filename, show=False):
 
-    dataset = dataset.groupBy(year(dataset[pickup_datetime_property])).sum(mta_tax_property)
+    dataset = dataset.groupBy(pyspark.sql.functions.year(dataset[pickup_datetime_property])).sum(mta_tax_property)
     if show:
         dataset.cache()
 
@@ -395,7 +409,7 @@ def compute_mta_tax_profits_by_year(dataset, result_filename, show=False):
 
 def compute_improvement_surcharge_profits_by_year(dataset, result_filename, show=False):
 
-    dataset = dataset.groupBy(year(dataset[pickup_datetime_property])).sum(improvement_surcharge_property)
+    dataset = dataset.groupBy(pyspark.sql.functions.year(dataset[pickup_datetime_property])).sum(improvement_surcharge_property)
     if show:
         dataset.cache()
 
@@ -446,7 +460,7 @@ def compute_average_tip_percentage(dataset, result_filename, show=False):
 def compute_average_tip_percentage_by_year(dataset, result_filename, show=False):
 
     # Only credit card tips are registered, so it makes sense to consider them only
-    dataset = dataset.where(dataset[payment_type_property] == 1).select(year(dataset[pickup_datetime_property]).alias("year"), (dataset[tip_amount_property] / (dataset[total_amount_property] - dataset[tip_amount_property])).alias("tip_percentage")).groupBy("year").avg("tip_percentage")
+    dataset = dataset.where(dataset[payment_type_property] == 1).select(pyspark.sql.functions.year(dataset[pickup_datetime_property]).alias("year"), (dataset[tip_amount_property] / (dataset[total_amount_property] - dataset[tip_amount_property])).alias("tip_percentage")).groupBy("year").avg("tip_percentage")
     if show:
         dataset.cache()
 
@@ -472,7 +486,7 @@ def compute_payment_type_distribution(dataset, result_filename, show=False):
 def compute_payment_type_by_year_distribution(dataset, result_filename, show=False):
 
     #Only credit card tips are registered, so it makes sense to consider them only
-    dataset = dataset.groupBy(year(dataset[pickup_datetime_property]).alias("year"), payment_type_property).count()
+    dataset = dataset.groupBy(pyspark.sql.functions.year(dataset[pickup_datetime_property]).alias("year"), payment_type_property).count()
     if show:
         dataset.cache()
 
@@ -485,7 +499,7 @@ def compute_payment_type_by_year_distribution(dataset, result_filename, show=Fal
 def compute_travels_by_year_and_company(dataset, result_filename, show=False):
 
     #Only credit card tips are registered, so it makes sense to consider them only
-    dataset = dataset.groupBy(year(dataset[pickup_datetime_property]).alias("year"), taxi_company_property).count()
+    dataset = dataset.groupBy(pyspark.sql.functions.year(dataset[pickup_datetime_property]).alias("year"), taxi_company_property).count()
     if show:
         dataset.cache()
 
@@ -498,7 +512,7 @@ def compute_travels_by_year_and_company(dataset, result_filename, show=False):
 def compute_profits_by_year_and_company(dataset, result_filename, show=False):
 
     #Only credit card tips are registered, so it makes sense to consider them only
-    dataset = dataset.groupBy(year(dataset[pickup_datetime_property]).alias("year"), taxi_company_property).sum(total_amount_property)
+    dataset = dataset.groupBy(pyspark.sql.functions.year(dataset[pickup_datetime_property]).alias("year"), taxi_company_property).sum(total_amount_property)
     if show:
         dataset.cache()
 
@@ -511,7 +525,7 @@ def compute_profits_by_year_and_company(dataset, result_filename, show=False):
 def compute_trip_distance_by_year_and_company_distribution(dataset, result_filename, show=False):
 
     #Only credit card tips are registered, so it makes sense to consider them only
-    dataset = dataset.groupBy(dataset[trip_distance_property].cast(IntegerType()).alias("distance"), taxi_company_property, year(dataset[pickup_datetime_property]).alias("year")).count()
+    dataset = dataset.groupBy(dataset[trip_distance_property].cast(IntegerType()).alias("distance"), taxi_company_property, pyspark.sql.functions.year(dataset[pickup_datetime_property]).alias("year")).count()
     if show:
         dataset.cache()
 
@@ -524,7 +538,7 @@ def compute_trip_distance_by_year_and_company_distribution(dataset, result_filen
 def compute_passenger_count_by_year_and_company_distribution(dataset, result_filename, show=False):
 
     #Only credit card tips are registered, so it makes sense to consider them only
-    dataset = dataset.groupBy(passenger_count_property, taxi_company_property, year(dataset[pickup_datetime_property]).alias("year")).count()
+    dataset = dataset.groupBy(passenger_count_property, taxi_company_property, pyspark.sql.functions.year(dataset[pickup_datetime_property]).alias("year")).count()
     if show:
         dataset.cache()
 
@@ -545,26 +559,80 @@ def compute_pickup_location_id_by_company_distribution(dataset, result_filename,
         dataset.show()
         dataset.unpersist()
 
+def cluster(dataset, max_clusters = 5, clustering_prediction_property = "clustering_predictions"):
+    taxi_company_indexed_property = 'taxi_company_indexed'
+    taxi_company_indexer = StringIndexer(inputCol=taxi_company_property, outputCol=taxi_company_indexed_property)
+
+    taxi_company_encoded_property = taxi_company_indexed_property + '_encoded'
+    ratecode_id_encoded_property = ratecode_id_property + '_encoded'
+    payment_type_encoded_property = payment_type_property + '_encoded'
+
+    one_hot_encoder = OneHotEncoderEstimator(inputCols=[taxi_company_indexed_property, ratecode_id_property, payment_type_property], outputCols=[taxi_company_encoded_property, ratecode_id_encoded_property, payment_type_encoded_property])
+
+    passenger_count_scaled_property = passenger_count_property + "_scaled"
+    trip_distance_scaled_property = trip_distance_property + "_scaled"
+    fare_amount_scaled_property = fare_amount_property + "_scaled"
+    tolls_amount_scaled_property = tolls_amount_property + "_scaled"
+
+    #passenger_count_scaler = StandardScaler(inputCol=passenger_count_property, outputCol=passenger_count_scaled_property, withStd=True, withMean=True)
+    #trip_distance_scaler = StandardScaler(inputCol=trip_distance_property, outputCol=trip_distance_scaled_property, withStd=True, withMean=True)
+    #fare_amount_scaler = StandardScaler(inputCol=fare_amount_property, outputCol=fare_amount_scaled_property, withStd=True, withMean=True)
+    #tolls_amount_scaler = StandardScaler(inputCol=tolls_amount_property, outputCol=tolls_amount_scaled_property, withStd=True, withMean=True)
+
+    clustering_features_property = 'features'
+
+    vector_assembler = VectorAssembler(inputCols=[taxi_company_indexed_property, passenger_count_property, trip_distance_property, ratecode_id_encoded_property, fare_amount_property, tolls_amount_property, payment_type_encoded_property], outputCol=clustering_features_property)
+
+    kmeans = KMeans(featuresCol=clustering_features_property, predictionCol=clustering_prediction_property, k=max_clusters)
+
+    #pipeline = Pipeline(stages=[taxi_company_indexer, one_hot_encoder, passenger_count_scaler, trip_distance_scaler, fare_amount_scaler, tolls_amount_scaler, vector_assembler, kmeans])
+    pipeline = Pipeline(stages=[taxi_company_indexer, one_hot_encoder, vector_assembler, kmeans])
+
+    model = pipeline.fit(dataset)
+
+    return model
+
 appName = 'Parquet Converter'
 master = 'local[*]'
 
 sc = pyspark.SparkContext()
 spark = SparkSession.builder.appName(appName).getOrCreate()
 
-dataset_folder = '/media/sf_dataset/'
-results_folder = '/media/sf_dataset/stats/'
-yellow_2018 = spark.read.parquet(dataset_folder + 'yellow_tripdata_2018.parquet').sample(False, 0.01)
-yellow_2017 = spark.read.parquet(dataset_folder + 'yellow_tripdata_2017.parquet')#.sample(False, 0.01)
+
+dataset_folder = '/home/bigdata/auxiliary/'
+results_folder = '/home/bigdata/auxiliary/stats/'
+
+#Build an entry for each archive to treat attaching the relative schema conversion routine to each one
+archives = []
+for year in range(2018, 2019):
+    if year <= 2014:
+        if year >= 2013:
+            archives += ['green_tripdata_' + str(year)]
+        archives += ['yellow_tripdata_' + str(year)]
+
+    elif year <= 2016:
+        archives += ['green_tripdata_' + str(year)]
+        archives += ['yellow_tripdata_' + str(year)]
+
+    else:
+        archives += ['green_tripdata_' + str(year)]
+        archives += ['yellow_tripdata_' + str(year)]
+
+dataset = None
+
+#Open and convert each archive to parquet format
+for archive in archives:
+    print("Reading: " + archive)
+
+    current_dataset = spark.read.parquet('file://' + dataset_folder + archive + '_common.parquet')
+    if dataset is None:
+        dataset = current_dataset
+    else:
+        dataset = dataset.union(current_dataset)
 
 
-yellow_2018 = schema_conversion.v3_yellow_to_common(yellow_2018)
-yellow_2017 = schema_conversion.v3_yellow_to_common(yellow_2017)
-
-#dataset = yellow_2017.union(yellow_2018)
-dataset = yellow_2018
-
-#dataset.printSchema()
-#dataset.show()
+dataset.printSchema()
+dataset.show()
 
 #compute_pickup_hour_distribution(dataset, results_folder + "pickup_hour_dist.csv", True)
 #compute_pickup_yearday_distribution(dataset, results_folder + "pickup_yearday_dist.csv", True)
@@ -613,3 +681,11 @@ dataset = yellow_2018
 #compute_passenger_count_by_year_and_company_distribution(dataset, results_folder + "passenger_count_by_year_and_company_distr.csv", True)
 #compute_pickup_location_id_by_company_distribution(dataset, results_folder + "pickup_location_by_company_distr.csv", True)
 
+#dataset = dataset.sample(0.0001)
+dataset = dataset.dropna()
+print("Building clustering Model")
+clustering_model = cluster(dataset)
+print("Performing clustering")
+clustered_dataset = clustering_model.transform(dataset)
+print("Clustering done")
+clustered_dataset.show(1000)

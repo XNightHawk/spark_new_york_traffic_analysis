@@ -592,6 +592,55 @@ def cluster(dataset, max_clusters = 5, clustering_prediction_property = "cluster
 
     return model
 
+def compute_mta_tax_distribution(dataset, result_filename, show=False):
+
+    dataset = dataset.groupBy(dataset[mta_tax_property].cast(IntegerType()).alias("mta_tax")).count()
+    if show:
+        dataset.cache()
+
+    dataset.toPandas().to_csv(result_filename, header=True)
+
+    if show:
+        dataset.show()
+        dataset.unpersist()
+
+def compute_improvement_surcharge_distribution(dataset, result_filename, show=False):
+
+    dataset = dataset.groupBy(dataset[improvement_surcharge_property].cast(IntegerType()).alias("improvement_surcharge")).count()
+    if show:
+        dataset.cache()
+
+    dataset.toPandas().to_csv(result_filename, header=True)
+
+    if show:
+        dataset.show()
+        dataset.unpersist()
+
+def compute_extra_distribution(dataset, result_filename, show=False):
+
+    dataset = dataset.groupBy(
+        dataset[extra_property].cast(IntegerType()).alias("extra")).count()
+    if show:
+        dataset.cache()
+
+    dataset.toPandas().to_csv(result_filename, header=True)
+
+    if show:
+        dataset.show()
+        dataset.unpersist()
+
+def compute_total_amount_distribution(dataset, result_filename, show=False):
+
+    dataset = dataset.groupBy(dataset[total_amount_property].cast(IntegerType())).count()
+    if show:
+        dataset.cache()
+
+    dataset.toPandas().to_csv(result_filename, header=True)
+
+    if show:
+        dataset.show()
+        dataset.unpersist()
+
 appName = 'Parquet Converter'
 master = 'local[*]'
 
@@ -604,7 +653,7 @@ results_folder = '/home/bigdata/auxiliary/stats/'
 
 #Build an entry for each archive to treat attaching the relative schema conversion routine to each one
 archives = []
-for year in range(2018, 2019):
+for year in range(2010, 2019):
     if year <= 2014:
         if year >= 2013:
             archives += ['green_tripdata_' + str(year)]
@@ -631,8 +680,8 @@ for archive in archives:
         dataset = dataset.union(current_dataset)
 
 
-dataset.printSchema()
-dataset.show()
+#dataset.printSchema()
+#dataset.show()
 
 #compute_pickup_hour_distribution(dataset, results_folder + "pickup_hour_dist.csv", True)
 #compute_pickup_yearday_distribution(dataset, results_folder + "pickup_yearday_dist.csv", True)
@@ -681,6 +730,13 @@ dataset.show()
 #compute_passenger_count_by_year_and_company_distribution(dataset, results_folder + "passenger_count_by_year_and_company_distr.csv", True)
 #compute_pickup_location_id_by_company_distribution(dataset, results_folder + "pickup_location_by_company_distr.csv", True)
 
+
+#compute_mta_tax_distribution(dataset, results_folder + "mta_tax_distr.csv", True)
+#compute_improvement_surcharge_distribution(dataset, results_folder + "improvement_surcharge_distr.csv", True)
+#compute_extra_distribution(dataset, results_folder + "extra_distr.csv", True)
+compute_total_amount_distribution(dataset, results_folder + "total_amount_distr.csv", True)
+
+'''
 #dataset = dataset.sample(0.0001)
 dataset = dataset.dropna()
 print("Building clustering Model")
@@ -689,3 +745,4 @@ print("Performing clustering")
 clustered_dataset = clustering_model.transform(dataset)
 print("Clustering done")
 clustered_dataset.show(1000)
+'''

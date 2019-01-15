@@ -57,7 +57,7 @@ lasts less than 12 hours
 
 not NULL
 different from -1
-range in [?, ?]
+range in [1, 265]
 
 -- dropoff_location_id
 
@@ -66,7 +66,7 @@ Same as pickup location
 -- passenger_count
 
 not NULL
-range in [0, 6]
+range in [1, 6]
 
 -- trip_distance
 
@@ -95,15 +95,28 @@ range in [0, 120]
 -- total_amount
 
 not NULL
-?
+range in [0, 175]
 
 -- mta_tax
 
 not NULL
+range in [0, 1]
 
 -- improvement_surcharge
+
+not NULL
+range in [0, 0.5]
+
 -- extra
+
+not NULL
+range in [0, 1]
+
 -- tip_amount
+
+not NULL
+range in [0, 60]
+
 -- payment_type
 
 not NULL

@@ -20,3 +20,5 @@ improvement_surcharge_property = 'improvement_surcharge'
 extra_property = 'extra'
 tip_amount_property = 'tip_amount'
 payment_type_property = 'payment_type'
+
+clustering_class_property = "cluster"

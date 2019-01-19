@@ -4,6 +4,7 @@ Statistical data analysis routines
 
 import pyspark
 from pyspark.ml import Pipeline
+from pyspark.ml import PipelineModel
 from pyspark.sql import SparkSession
 import pyspark.sql.functions
 from pyspark.sql.types import *
@@ -37,12 +38,6 @@ def cluster(dataset, spark, max_clusters = 5, max_iterations = 40, clustering_pr
     pickup_hour_extractor = SQLTransformer(statement = "SELECT *, HOUR(" + pickup_datetime_property + ") AS " + pickup_hour_property + " FROM __THIS__")
     dropoff_hour_extractor = SQLTransformer(statement = "SELECT *, HOUR(" + dropoff_datetime_property + ") AS " + dropoff_hour_property + " FROM __THIS__")
     weekend_extractor = SQLTransformer(statement = "SELECT *, (DAYOFWEEK(" + pickup_datetime_property + ") == 6 OR DAYOFWEEK(" + pickup_datetime_property + ") == 5) AS " + weekend_property + " FROM __THIS__")
-
-    def timestamp_diff(end_time, start_time):
-        #Adds 1 to avoid divisions by 0
-        return (end_time - start_time).seconds + 1
-
-    spark.udf.register("timestamp_diff", timestamp_diff, IntegerType())
 
     speed_extractor = SQLTransformer(statement = "SELECT *, (" + trip_distance_property + " / (timestamp_diff(" + dropoff_datetime_property + ", " + pickup_datetime_property + ") / 1000)) AS " + speed_property + " FROM __THIS__")
 
@@ -136,6 +131,12 @@ if not clean_dataset:
 else:
     dataset = spark.read.parquet('file://' + dataset_folder + 'clean_dataset.parquet')
 
+def timestamp_diff(end_time, start_time):
+    #Adds 1 to avoid divisions by 0
+    return (end_time - start_time).seconds + 1
+
+spark.udf.register("timestamp_diff", timestamp_diff, IntegerType())
+
 #dataset.printSchema()
 #dataset.show()
 
@@ -144,12 +145,16 @@ else:
 
 clustering_training_dataset = dataset.sample(0.03)
 
+'''
 clustering_model = cluster(clustering_training_dataset, spark, max_clusters = 4, max_iterations = 40, clustering_prediction_property = clustering_class_property)
 
 try:
     clustering_model.save('file://' + dataset_folder + 'clustering_model.model')
 except:
     print("Clustering model already exists. Continuing without saving")
+'''
+
+clustering_model = PipelineModel.load('file://' + dataset_folder + 'clustering_model.model')
 
 #Assigns classes to the whole dataset
 clustered_dataset = clustering_model.transform(dataset)

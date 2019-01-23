@@ -505,7 +505,7 @@ def compute_monthly_profit_percentage_by_year_and_month(dataset, result_filename
         dataset = month_profit_dataset.join(year_profit_dataset, "year").select("year", "month", month_profit_dataset["sum(" + total_amount_property + ")"] / year_profit_dataset["sum(" + total_amount_property + ")"])
     else:
         year_profit_dataset = dataset.groupBy(pyspark.sql.functions.year(dataset[pickup_datetime_property]).alias("year"), clustering_class_property).sum(total_amount_property)
-        month_profit_dataset = dataset.groupBy(pyspark.sql.functions.year(dataset[pickup_datetime_property]).alias("year"), month(dataset[pickup_datetime_property], clustering_class_property).alias("month")).sum(total_amount_property)
+        month_profit_dataset = dataset.groupBy(pyspark.sql.functions.year(dataset[pickup_datetime_property]).alias("year"), month(dataset[pickup_datetime_property]).alias("month"), clustering_class_property).sum(total_amount_property)
 
         dataset = month_profit_dataset.join(year_profit_dataset, ["year", clustering_class_property]).select("year", "month", clustering_class_property, month_profit_dataset["sum(" + total_amount_property + ")"] / year_profit_dataset["sum(" + total_amount_property + ")"])
 
@@ -604,7 +604,7 @@ def compute_tips_distribution(dataset, result_filename, show=False, separe_clust
     if separe_clusters == False:
         dataset = dataset.where(dataset[payment_type_property] == 1).groupBy(dataset[tip_amount_property].cast(IntegerType()).alias("tip_amount")).count()
     else:
-        dataset = dataset.where(dataset[payment_type_property] == 1).groupBy(dataset[tip_amount_property].cast(IntegerType(), clustering_class_property).alias("tip_amount")).count()
+        dataset = dataset.where(dataset[payment_type_property] == 1).groupBy(dataset[tip_amount_property].cast(IntegerType()).alias("tip_amount"), clustering_class_property).count()
 
     if show:
         dataset.cache()
@@ -821,6 +821,43 @@ def compute_total_amount_distribution(dataset, result_filename, show=False, sepa
         dataset = dataset.groupBy(dataset[total_amount_property].cast(IntegerType())).count()
     else:
         dataset = dataset.groupBy(dataset[total_amount_property].cast(IntegerType()), clustering_class_property).count()
+
+    if show:
+        dataset.cache()
+
+    dataset.toPandas().to_csv(result_filename, header=True)
+
+    if show:
+        dataset.show()
+        dataset.unpersist()
+
+def compute_mean(dataset, result_filename, column, show=False, separe_clusters=False):
+
+    if separe_clusters == False:
+        dataset = dataset.groupBy()
+    else:
+        dataset = dataset.groupBy(clustering_class_property)
+
+    dataset = dataset.agg(mean(column))
+
+    if show:
+        dataset.cache()
+
+    dataset.toPandas().to_csv(result_filename, header=True)
+
+    if show:
+        dataset.show()
+        dataset.unpersist()
+
+def compute_variance(dataset, result_filename, column, show=False, separe_clusters=False):
+
+    if separe_clusters == False:
+        grouped_dataset = dataset.groupBy()
+    else:
+        grouped_dataset = dataset.groupBy(clustering_class_property)
+
+    #Var[X] = E[X^2] - E[X]^2
+    dataset = grouped_dataset.agg(mean(pow(column, 2)) - pow(mean(column), 2))
 
     if show:
         dataset.cache()

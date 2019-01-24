@@ -15,6 +15,10 @@ from computed_columns import *
 #Filters dataset returning the filtered one
 def clean(dataset):
 
+    #Not used columns which contain many nulls
+    dataset = dataset.drop(store_and_forward_flag_property)
+    dataset = dataset.drop(vendor_id_property)
+
     #No nulls in the dataset
     dataset = dataset.dropna()
 
@@ -49,6 +53,7 @@ sc = pyspark.SparkContext()
 spark = SparkSession.builder.appName(appName).getOrCreate()
 
 
+read_dataset_folder = '/media/sf_dataset/'
 dataset_folder = '/home/bigdata/auxiliary/'
 results_folder = '/home/bigdata/auxiliary/stats/'
 
@@ -74,7 +79,7 @@ dataset = None
 for archive in archives:
     print("Reading: " + archive)
 
-    current_dataset = spark.read.parquet('file://' + dataset_folder + archive + '_common.parquet')
+    current_dataset = spark.read.parquet('file://' + read_dataset_folder + archive + '_common.parquet')
     if dataset is None:
         dataset = current_dataset
     else:

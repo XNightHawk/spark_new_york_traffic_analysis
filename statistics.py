@@ -5,6 +5,7 @@ import pyspark.sql.functions
 from pyspark.sql.types import *
 from pyspark.sql.functions import *
 from pyspark.sql.window import Window
+from pyspark.sql.functions import lit
 
 import schema_conversion
 from schema import *
@@ -207,7 +208,7 @@ def compute_total_amount_by_pickup_hour_distribution(dataset, result_filename, s
 def compute_average_total_amount_by_pickup_hour(dataset, result_filename, show=False, separe_clusters=False):
 
     if separe_clusters == False:
-        dataset = dataset.groupBy(hour(pickup_datetime_property), clustering_class_property).avg(total_amount_property)
+        dataset = dataset.groupBy(hour(pickup_datetime_property)).avg(total_amount_property)
     else:
         dataset = dataset.groupBy(hour(pickup_datetime_property), clustering_class_property).avg(total_amount_property)
 
@@ -223,7 +224,7 @@ def compute_average_total_amount_by_pickup_hour(dataset, result_filename, show=F
 def compute_average_duration_by_pickup_location(dataset, result_filename, show=False, separe_clusters=False):
 
     if separe_clusters == False:
-        dataset = dataset.select(pickup_location_id_property, (unix_timestamp(dropoff_datetime_property) - unix_timestamp(pickup_datetime_property)).alias("duration_seconds")).groupBy(pickup_location_id_property, clustering_class_property).avg("duration_seconds")
+        dataset = dataset.select(pickup_location_id_property, (unix_timestamp(dropoff_datetime_property) - unix_timestamp(pickup_datetime_property)).alias("duration_seconds")).groupBy(pickup_location_id_property).avg("duration_seconds")
     else:
         dataset = dataset.select(pickup_location_id_property, (unix_timestamp(dropoff_datetime_property) - unix_timestamp(pickup_datetime_property)).alias("duration_seconds"), clustering_class_property).groupBy(pickup_location_id_property, clustering_class_property).avg("duration_seconds")
 
@@ -859,6 +860,111 @@ def compute_variance(dataset, result_filename, column, show=False, separe_cluste
 
     #Var[X] = E[X^2] - E[X]^2
     dataset = grouped_dataset.agg(mean(pow(column, 2)) - pow(mean(column), 2))
+
+    if show:
+        dataset.cache()
+
+    dataset.toPandas().to_csv(result_filename, header=True)
+
+    if show:
+        dataset.show()
+        dataset.unpersist()
+
+def compute_airport_distribution(dataset, result_filename, show=False, separe_clusters=False):
+    airport_locations = [132, 138]
+    airport_dataset = dataset.filter(dataset[dropoff_location_id_property].isin(airport_locations) | dataset[pickup_location_id_property].isin(airport_locations) | (dataset[ratecode_id_property] == 3))
+
+    non_airport_dataset = dataset.filter((dataset[dropoff_location_id_property].isin(airport_locations) | dataset[pickup_location_id_property].isin(airport_locations) | (dataset[ratecode_id_property] == 3)) == False)
+
+    jfk_dataset = airport_dataset.filter((dataset[dropoff_location_id_property] == 132) | (dataset[pickup_location_id_property] == 132))
+    laguardia_dataset = airport_dataset.filter((dataset[dropoff_location_id_property] == 138) | (dataset[pickup_location_id_property] == 138))
+    newark_dataset = airport_dataset.filter(dataset[ratecode_id_property] == 3)
+
+    non_airport_dataset = non_airport_dataset.groupBy().count()
+    jfk_dataset = jfk_dataset.groupBy().count()
+    laguardia_dataset = laguardia_dataset.groupBy().count()
+    newark_dataset = newark_dataset.groupBy().count()
+
+    non_airport_dataset = non_airport_dataset.withColumn("class", lit("no_airport"))
+    jfk_dataset = jfk_dataset.withColumn("class", lit("jfk"))
+    laguardia_dataset = laguardia_dataset.withColumn("class", lit("laguardia"))
+    newark_dataset = newark_dataset.withColumn("class", lit("newark"))
+
+    dataset = non_airport_dataset.union(jfk_dataset).union(laguardia_dataset).union(newark_dataset)
+
+    if show:
+        dataset.cache()
+
+    dataset.toPandas().to_csv(result_filename, header=True)
+
+    if show:
+        dataset.show()
+        dataset.unpersist()
+
+def compute_total_amount_by_airport(dataset, result_filename, show=False, separe_clusters=False):
+    airport_locations = [132, 138]
+    airport_dataset = dataset.filter(dataset[dropoff_location_id_property].isin(airport_locations) | dataset[
+        pickup_location_id_property].isin(airport_locations) | (dataset[ratecode_id_property] == 3))
+
+    non_airport_dataset = dataset.filter((dataset[dropoff_location_id_property].isin(airport_locations) |
+                                          dataset[pickup_location_id_property].isin(airport_locations) | (
+                                                      dataset[ratecode_id_property] == 3)) == False)
+
+    jfk_dataset = airport_dataset.filter(
+        (dataset[dropoff_location_id_property] == 132) | (dataset[pickup_location_id_property] == 132))
+    laguardia_dataset = airport_dataset.filter(
+        (dataset[dropoff_location_id_property] == 138) | (dataset[pickup_location_id_property] == 138))
+    newark_dataset = airport_dataset.filter(dataset[ratecode_id_property] == 3)
+
+    non_airport_dataset = non_airport_dataset.groupBy().sum(total_amount_property)
+    jfk_dataset = jfk_dataset.groupBy().sum(total_amount_property)
+    laguardia_dataset = laguardia_dataset.groupBy().sum(total_amount_property)
+    newark_dataset = newark_dataset.groupBy().sum(total_amount_property)
+
+    non_airport_dataset = non_airport_dataset.withColumn("class", lit("no_airport"))
+    jfk_dataset = jfk_dataset.withColumn("class", lit("jfk"))
+    laguardia_dataset = laguardia_dataset.withColumn("class", lit("laguardia"))
+    newark_dataset = newark_dataset.withColumn("class", lit("newark"))
+
+    dataset = non_airport_dataset.union(jfk_dataset).union(laguardia_dataset).union(newark_dataset)
+
+    if show:
+        dataset.cache()
+
+    dataset.toPandas().to_csv(result_filename, header=True)
+
+    if show:
+        dataset.show()
+        dataset.unpersist()
+
+def compute_fare_amount_by_company_distribution(dataset, result_filename, show=False, separe_clusters=False):
+
+    # Only credit card tips are registered, so it makes sense to consider them only
+    if separe_clusters == False:
+        dataset = dataset.groupBy(dataset[fare_amount_property].cast(IntegerType()).alias("fare_amount"),
+                                  taxi_company_property).count()
+    else:
+        dataset = dataset.groupBy(dataset[fare_amount_property].cast(IntegerType()).alias("fare_amount"),
+                                  taxi_company_property, clustering_class_property).count()
+
+    if show:
+        dataset.cache()
+
+    dataset.toPandas().to_csv(result_filename, header=True)
+
+    if show:
+        dataset.show()
+        dataset.unpersist()
+
+def compute_trip_distance_by_company_distribution(dataset, result_filename, show=False, separe_clusters=False):
+
+    # Only credit card tips are registered, so it makes sense to consider them only
+    if separe_clusters == False:
+        dataset = dataset.groupBy(dataset[trip_distance_property].cast(IntegerType()).alias("distance"),
+                                  taxi_company_property).count()
+    else:
+        dataset = dataset.groupBy(dataset[trip_distance_property].cast(IntegerType()).alias("distance"),
+                                  taxi_company_property, clustering_class_property).count()
 
     if show:
         dataset.cache()

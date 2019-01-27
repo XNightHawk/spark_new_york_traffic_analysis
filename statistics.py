@@ -973,3 +973,23 @@ def compute_trip_distance_by_company_distribution(dataset, result_filename, show
     if show:
         dataset.show()
         dataset.unpersist()
+
+def compute_average_column_by_year(dataset, column_name, result_filename, show=False, separe_clusters=False):
+
+    # Only credit card tips are registered, so it makes sense to consider them only
+    if separe_clusters == False:
+        dataset = dataset.groupBy(pyspark.sql.functions.year(dataset[pickup_datetime_property])).avg(column_name)
+    else:
+        dataset = dataset.groupBy(pyspark.sql.functions.year(dataset[pickup_datetime_property]), clustering_class_property).avg(column_name)
+
+    if show:
+        dataset.cache()
+
+    dataset.toPandas().to_csv(result_filename, header=True)
+
+    if show:
+        dataset.show()
+        dataset.unpersist()
+
+
+

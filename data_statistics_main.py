@@ -26,11 +26,10 @@ spark = SparkSession.builder.appName(appName).getOrCreate()
 
 
 dataset_folder = '/home/bigdata/auxiliary/'
-dataset_folder = '/media/sf_dataset/'
 results_folder = '/home/bigdata/auxiliary/stats/'
 
 #Whether to use the cleaned dataset or the uncleaned one
-clustered_dataset = False
+clustered_dataset = True
 
 #Whether to perform a per cluster analysis or a global one
 clustered_analysis = False
@@ -67,76 +66,91 @@ if not clustered_dataset:
 else:
     dataset = spark.read.parquet('file://' + dataset_folder + 'clustered_dataset.parquet')
 
-dataset.groupBy(vendor_id_property).count().show(1000)
-dataset.groupBy(store_and_forward_flag_property).count().show(1000)
-
 #dataset.printSchema()
 #dataset.show()
 
-#compute_pickup_hour_distribution(dataset, results_folder + "pickup_hour_dist.csv", True, clustered_analysis)
-#compute_pickup_yearday_distribution(dataset, results_folder + "pickup_yearday_dist.csv", True, clustered_analysis)
-#compute_pickup_weekday_distribution(dataset, results_folder + "pickup_weekday_dist.csv", True, clustered_analysis)
-#compute_pickup_month_distribution(dataset, results_folder + "pickup_month_dist.csv", True, clustered_analysis)
-#compute_pickup_location_id_distribution(dataset, results_folder + "pickup_location_id_dist.csv", True, clustered_analysis)
-#compute_dropoff_location_id_distribution(dataset, results_folder + "dropoff_location_id_dist.csv", True, clustered_analysis)
-#compute_passenger_count_distribution(dataset, results_folder + "passenger_count_dist.csv", True, clustered_analysis)
-#compute_trip_duration_distribution(dataset, results_folder + "trip_duration_dist.csv", True, clustered_analysis)
-#compute_trip_distance_by_pickup_hour_distribution(dataset, results_folder + "trip_distance_by_pickup_hour_dist.csv", True, clustered_analysis)
-#compute_trip_duration_by_pickup_hour_distribution(dataset, results_folder + "trip_duration_by_pickup_hour_dist.csv", True, clustered_analysis)
-#compute_average_speed_by_pickup_hour_distribution(dataset, results_folder + "avg_speed_by_pickup_hour_dist.csv", True, clustered_analysis)
-#compute_total_amount_by_pickup_hour_distribution(dataset, results_folder + "total_amount_by_pickup_hour_dist.csv", True, clustered_analysis)
-#compute_average_total_amount_by_pickup_hour(dataset, results_folder + "avg_total_amount_by_pickup_hour.csv", True, clustered_analysis)
-#compute_average_duration_by_pickup_location(dataset, results_folder + "avg_duration_by_pickup_location.csv", True, clustered_analysis)
-#compute_average_distance_by_pickup_location(dataset, results_folder + "avg_distance_by_pickup_location.csv", True, clustered_analysis)
-#compute_average_speed_by_pickup_location(dataset, results_folder + "avg_speed_by_pickup_location.csv", True, clustered_analysis)
-#compute_average_total_amount_by_pickup_location(dataset, results_folder + "avg_total_amount_by_pickup_location.csv", True, clustered_analysis)
-#compute_pickup_location_distribution(dataset, results_folder + "pickup_location_distr.csv", True, clustered_analysis)
-#compute_pickup_location_by_pickup_hour_distribution(dataset, results_folder + "pickup_location_by_pickup_hour_distr.csv", True, clustered_analysis)
-#compute_dropoff_location_distribution(dataset, results_folder + "dropoff_location_distr.csv", True, clustered_analysis)
-#compute_dropoff_location_by_pickup_hour_distribution(dataset, results_folder + "dropoff_location_by_pickup_hour_distr.csv", True, clustered_analysis)
-#compute_pickup_dropoff_location_by_pickup_hour_distribution(dataset, results_folder + "pickup_dropoff_location_by_pickup_hour_distr.csv", True, clustered_analysis)
-#compute_passenger_count_distribution(dataset, results_folder + "passenger_count_distr.csv", True, clustered_analysis)
-#compute_trip_distance_distribution(dataset, results_folder + "trip_distance_distr.csv", True, clustered_analysis)
-#compute_ratecode_distribution(dataset, results_folder + "ratecode_distr.csv", True, clustered_analysis)
-#compute_fare_amount_distribution(dataset, results_folder + "fare_amount_distr.csv", True, clustered_analysis)
-#compute_average_fare_amount_percentage_by_year(dataset, results_folder + "avg_fare_amount_percentage.csv", True, clustered_analysis)
-#compute_tolls_amount_distribution(dataset, results_folder + "tolls_amount_distr.csv", True, clustered_analysis)
-#compute_total_amount_distribution(dataset, results_folder + "total_amount_distr.csv", True, clustered_analysis)
-#compute_profits_by_year(dataset, results_folder + "profits_by_year.csv", True, clustered_analysis)
-#compute_monthly_profit_percentage_by_year_and_month(dataset, results_folder + "monthly_profit_by_year.csv", True, clustered_analysis)
-#compute_average_total_amount_by_year(dataset, results_folder + "avg_total_amount_by_year.csv", True, clustered_analysis)
-#compute_average_total_amount_by_month(dataset, results_folder + "avg_total_amount_by_month.csv", True, clustered_analysis)
-#compute_mta_tax_profits_by_year(dataset, results_folder + "mta_tax_by_year.csv", True, clustered_analysis)
-#compute_improvement_surcharge_profits_by_year(dataset, results_folder + "improvement_surcharge_by_year.csv", True, clustered_analysis)
-#compute_average_extra_by_hour(dataset, results_folder + "avg_extra_by_hour.csv", True, clustered_analysis)
-#compute_tips_distribution(dataset, results_folder + "tips_distr.csv", True, clustered_analysis)
-#compute_average_tip_percentage(dataset, results_folder + "avg_tip_percentage.csv", True, clustered_analysis)
-#compute_average_tip_percentage_by_year(dataset, results_folder + "avg_tip_percentage_by_year.csv", True, clustered_analysis)
-#compute_payment_type_distribution(dataset, results_folder + "payment_type_distr.csv", True, clustered_analysis)
-#compute_payment_type_by_year_distribution(dataset, results_folder + "payment_type_distr.csv", True, clustered_analysis)
+'''
+compute_pickup_hour_distribution(dataset, results_folder + "pickup_hour_dist.csv", True, clustered_analysis)
+compute_pickup_yearday_distribution(dataset, results_folder + "pickup_yearday_dist.csv", True, clustered_analysis)
+compute_pickup_weekday_distribution(dataset, results_folder + "pickup_weekday_dist.csv", True, clustered_analysis)
+compute_pickup_month_distribution(dataset, results_folder + "pickup_month_dist.csv", True, clustered_analysis)
+compute_pickup_location_id_distribution(dataset, results_folder + "pickup_location_id_dist.csv", True, clustered_analysis)
+compute_dropoff_location_id_distribution(dataset, results_folder + "dropoff_location_id_dist.csv", True, clustered_analysis)
+compute_passenger_count_distribution(dataset, results_folder + "passenger_count_dist.csv", True, clustered_analysis)
+compute_trip_duration_distribution(dataset, results_folder + "trip_duration_dist.csv", True, clustered_analysis)
+compute_trip_distance_by_pickup_hour_distribution(dataset, results_folder + "trip_distance_by_pickup_hour_dist.csv", True, clustered_analysis)
+compute_trip_duration_by_pickup_hour_distribution(dataset, results_folder + "trip_duration_by_pickup_hour_dist.csv", True, clustered_analysis)
+compute_average_speed_by_pickup_hour_distribution(dataset, results_folder + "avg_speed_by_pickup_hour_dist.csv", True, clustered_analysis)
+compute_total_amount_by_pickup_hour_distribution(dataset, results_folder + "total_amount_by_pickup_hour_dist.csv", True, clustered_analysis)
+compute_average_total_amount_by_pickup_hour(dataset, results_folder + "avg_total_amount_by_pickup_hour.csv", True, clustered_analysis)
+compute_average_duration_by_pickup_location(dataset, results_folder + "avg_duration_by_pickup_location.csv", True, clustered_analysis)
+compute_average_distance_by_pickup_location(dataset, results_folder + "avg_distance_by_pickup_location.csv", True, clustered_analysis)
+compute_average_speed_by_pickup_location(dataset, results_folder + "avg_speed_by_pickup_location.csv", True, clustered_analysis)
+compute_average_total_amount_by_pickup_location(dataset, results_folder + "avg_total_amount_by_pickup_location.csv", True, clustered_analysis)
+compute_pickup_location_distribution(dataset, results_folder + "pickup_location_distr.csv", True, clustered_analysis)
+compute_pickup_location_by_pickup_hour_distribution(dataset, results_folder + "pickup_location_by_pickup_hour_distr.csv", True, clustered_analysis)
+compute_dropoff_location_distribution(dataset, results_folder + "dropoff_location_distr.csv", True, clustered_analysis)
+compute_dropoff_location_by_pickup_hour_distribution(dataset, results_folder + "dropoff_location_by_pickup_hour_distr.csv", True, clustered_analysis)
+compute_pickup_dropoff_location_by_pickup_hour_distribution(dataset, results_folder + "pickup_dropoff_location_by_pickup_hour_distr.csv", True, clustered_analysis)
+compute_passenger_count_distribution(dataset, results_folder + "passenger_count_distr.csv", True, clustered_analysis)
+compute_trip_distance_distribution(dataset, results_folder + "trip_distance_distr.csv", True, clustered_analysis)
+compute_ratecode_distribution(dataset, results_folder + "ratecode_distr.csv", True, clustered_analysis)
+compute_fare_amount_distribution(dataset, results_folder + "fare_amount_distr.csv", True, clustered_analysis)
+compute_average_fare_amount_percentage_by_year(dataset, results_folder + "avg_fare_amount_percentage.csv", True, clustered_analysis)
+compute_tolls_amount_distribution(dataset, results_folder + "tolls_amount_distr.csv", True, clustered_analysis)
+compute_total_amount_distribution(dataset, results_folder + "total_amount_distr.csv", True, clustered_analysis)
+compute_profits_by_year(dataset, results_folder + "profits_by_year.csv", True, clustered_analysis)
+compute_monthly_profit_percentage_by_year_and_month(dataset, results_folder + "monthly_profit_by_year.csv", True, clustered_analysis)
+compute_average_total_amount_by_year(dataset, results_folder + "avg_total_amount_by_year.csv", True, clustered_analysis)
+compute_average_total_amount_by_month(dataset, results_folder + "avg_total_amount_by_month.csv", True, clustered_analysis)
+compute_mta_tax_profits_by_year(dataset, results_folder + "mta_tax_by_year.csv", True, clustered_analysis)
+compute_improvement_surcharge_profits_by_year(dataset, results_folder + "improvement_surcharge_by_year.csv", True, clustered_analysis)
+compute_average_extra_by_hour(dataset, results_folder + "avg_extra_by_hour.csv", True, clustered_analysis)
+compute_tips_distribution(dataset, results_folder + "tips_distr.csv", True, clustered_analysis)
+compute_average_tip_percentage(dataset, results_folder + "avg_tip_percentage.csv", True, clustered_analysis)
+compute_average_tip_percentage_by_year(dataset, results_folder + "avg_tip_percentage_by_year.csv", True, clustered_analysis)
+compute_payment_type_distribution(dataset, results_folder + "payment_type_distr.csv", True, clustered_analysis)
+compute_payment_type_by_year_distribution(dataset, results_folder + "payment_type_distr.csv", True, clustered_analysis)
 
-#compute_travels_by_year_and_company(dataset, results_folder + "travels_by_year_and company.csv", True, clustered_analysis)
-#compute_profits_by_year_and_company(dataset, results_folder + "profits_by_year_and company.csv", True, clustered_analysis)
-#compute_trip_distance_by_year_and_company_distribution(dataset, results_folder + "trip_distance_by_year_and company_distr.csv", True, clustered_analysis)
-#compute_passenger_count_by_year_and_company_distribution(dataset, results_folder + "passenger_count_by_year_and_company_distr.csv", True, clustered_analysis)
-#compute_pickup_location_id_by_company_distribution(dataset, results_folder + "pickup_location_by_company_distr.csv", True, clustered_analysis)
-#compute_pickup_location_id_by_company_distribution(dataset.filter(pyspark.sql.functions.year(dataset[pickup_datetime_property]) >= 2014), results_folder + "pickup_location_by_company_after_2014_distr.csv", True, clustered_analysis)
-#compute_fare_amount_by_company_distribution(dataset, results_folder + "fare_amount_by_company_distr.csv", True, clustered_analysis)
-#compute_trip_distance_by_company_distribution(dataset, results_folder + "trip_distance_by_company_distr.csv", True, clustered_analysis)
+compute_travels_by_year_and_company(dataset, results_folder + "travels_by_year_and company.csv", True, clustered_analysis)
+compute_profits_by_year_and_company(dataset, results_folder + "profits_by_year_and company.csv", True, clustered_analysis)
+compute_trip_distance_by_year_and_company_distribution(dataset, results_folder + "trip_distance_by_year_and company_distr.csv", True, clustered_analysis)
+compute_passenger_count_by_year_and_company_distribution(dataset, results_folder + "passenger_count_by_year_and_company_distr.csv", True, clustered_analysis)
+compute_pickup_location_id_by_company_distribution(dataset, results_folder + "pickup_location_by_company_distr.csv", True, clustered_analysis)
+compute_pickup_location_id_by_company_distribution(dataset.filter(pyspark.sql.functions.year(dataset[pickup_datetime_property]) >= 2014), results_folder + "pickup_location_by_company_after_2014_distr.csv", True, clustered_analysis)
+compute_fare_amount_by_company_distribution(dataset, results_folder + "fare_amount_by_company_distr.csv", True, clustered_analysis)
+compute_trip_distance_by_company_distribution(dataset, results_folder + "trip_distance_by_company_distr.csv", True, clustered_analysis)
 
-#compute_mta_tax_distribution(dataset, results_folder + "mta_tax_distr.csv", True, clustered_analysis)
-#compute_improvement_surcharge_distribution(dataset, results_folder + "improvement_surcharge_distr.csv", True, clustered_analysis)
-#compute_extra_distribution(dataset, results_folder + "extra_distr.csv", True, clustered_analysis)
-#compute_total_amount_distribution(dataset, results_folder + "total_amount_distr.csv", True, clustered_analysis)
+compute_mta_tax_distribution(dataset, results_folder + "mta_tax_distr.csv", True, clustered_analysis)
+compute_improvement_surcharge_distribution(dataset, results_folder + "improvement_surcharge_distr.csv", True, clustered_analysis)
+compute_extra_distribution(dataset, results_folder + "extra_distr.csv", True, clustered_analysis)
+compute_total_amount_distribution(dataset, results_folder + "total_amount_distr.csv", True, clustered_analysis)
 
-#for current_column in [(dataset[payment_type_property], "payment_type"), (dataset[ratecode_id_property], "ratecode_id"), (dayofweek(dataset[dropoff_datetime_property]), 'dayofweek'), (hour(dataset[pickup_datetime_property]), "pickup_hour"), (hour(dataset[dropoff_datetime_property]), "dropoff_hour"), (dataset[passenger_count_property], "passenger_count"), (speed_column(dataset, 'speed'), "speed"), (dataset[trip_distance_property], "distance"), (dataset[fare_amount_property], "fare_amount"), (dataset[tolls_amount_property], 'tolls_amount'), (dataset[tip_amount_property], 'tip_amount')]:
+for current_column in [(dataset[payment_type_property], "payment_type"), (dataset[ratecode_id_property], "ratecode_id"), (dayofweek(dataset[dropoff_datetime_property]), 'dayofweek'), (hour(dataset[pickup_datetime_property]), "pickup_hour"), (hour(dataset[dropoff_datetime_property]), "dropoff_hour"), (dataset[passenger_count_property], "passenger_count"), (speed_column(dataset, 'speed'), "speed"), (dataset[trip_distance_property], "distance"), (dataset[fare_amount_property], "fare_amount"), (dataset[tolls_amount_property], 'tolls_amount'), (dataset[tip_amount_property], 'tip_amount')]:
 
-#    compute_mean(dataset, results_folder + current_column[1] + "_mean.csv", current_column[0], True, clustered_analysis)
-#    compute_variance(dataset, results_folder + current_column[1] + "_variance.csv", current_column[0], True, clustered_analysis)
+    compute_mean(dataset, results_folder + current_column[1] + "_mean.csv", current_column[0], True, clustered_analysis)
+    compute_variance(dataset, results_folder + current_column[1] + "_variance.csv", current_column[0], True, clustered_analysis)
 
 #Traffic movement analysis
 
-#for zone in [("manhattan", manhattan_ids), ("bronx", bronx_ids), ("brooklyn", brooklyn_ids), ("queens", queens_ids), ("staten_island", staten_island_ids)]:
-#    zone_dataset = dataset.filter(dataset[pickup_location_id_property].isin(zone[1]))
-#    compute_dropoff_location_id_distribution(zone_dataset, results_folder + zone[0] + "_dropoff_location_id_dist.csv", True, clustered_analysis)
-#    compute_dropoff_location_by_pickup_hour_distribution(zone_dataset, results_folder + zone[0] + "_dropoff_location_id_by_pickup_hour_dist.csv", True, clustered_analysis)
+for zone in [("manhattan", manhattan_ids), ("bronx", bronx_ids), ("brooklyn", brooklyn_ids), ("queens", queens_ids), ("staten_island", staten_island_ids)]:
+    zone_dataset = dataset.filter(dataset[pickup_location_id_property].isin(zone[1]))
+    compute_dropoff_location_id_distribution(zone_dataset, results_folder + zone[0] + "_dropoff_location_id_dist.csv", True, clustered_analysis)
+    compute_dropoff_location_by_pickup_hour_distribution(zone_dataset, results_folder + zone[0] + "_dropoff_location_id_by_pickup_hour_dist.csv", True, clustered_analysis)
+'''
+
+#average_column_names = [extra_property, improvement_surcharge_property, tolls_amount_property, fare_amount_property, tip_amount_property]
+
+#for current_column_name in average_column_names:
+
+#    compute_average_column_by_year(dataset, current_column_name, results_folder + "avg_" + current_column_name + "_by_year.csv", True, clustered_analysis)
+
+#dataset.where(dataset[ratecode_id_property] == 2).groupBy(pyspark.sql.functions.year(dataset[pickup_datetime_property])).avg(fare_amount_property).show(1000)
+
+#dataset.groupBy(pyspark.sql.functions.hour(dataset[pickup_datetime_property])).avg(trip_distance_property).show(1000)
+#dataset.groupBy(pyspark.sql.functions.year(dataset[pickup_datetime_property])).avg(extra_property).show(1000)
+#dataset.groupBy(pyspark.sql.functions.year(dataset[pickup_datetime_property])).avg(improvement_surcharge_property).show(1000)
+#dataset.groupBy(pyspark.sql.functions.year(dataset[pickup_datetime_property])).avg(tolls_amount_property).show(1000)
+#dataset.groupBy(pyspark.sql.functions.year(dataset[pickup_datetime_property])).avg(fare_amount_property).show(1000)
+#dataset.where(dataset[payment_type_property] == 1).groupBy(pyspark.sql.functions.year(dataset[pickup_datetime_property])).avg(tip_amount_property).show(1000)
+#dataset.where(dataset[payment_type_property] == 2).groupBy(pyspark.sql.functions.year(dataset[pickup_datetime_property])).avg(tip_amount_property).show(1000)

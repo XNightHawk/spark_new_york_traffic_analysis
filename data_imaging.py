@@ -125,14 +125,14 @@ def elaborate_image(image_name):
 
     np.save(dataset_folder + image_name, counts)
 
-pool = multiprocessing.Pool(6)
-pool.map(elaborate_image, image_names)
+#pool = multiprocessing.Pool(6)
+#pool.map(elaborate_image, image_names)
 
 for image_name in image_names:
 
     counts = np.load(dataset_folder + image_name + ".npy")
     counts = np.log(counts + 1)
-    plt.imsave(dataset_folder + image_name +".png", counts, dpi=4000)
+    plt.imsave(dataset_folder + image_name +".png", counts, dpi=4000, cmap="Greys")
 
 '''
 image = pd.read_csv(dataset_folder + "data_image.csv")

@@ -24,7 +24,6 @@ master = 'local[*]'
 sc = pyspark.SparkContext()
 spark = SparkSession.builder.appName(appName).getOrCreate()
 
-
 dataset_folder = '/home/bigdata/auxiliary/'
 results_folder = '/home/bigdata/auxiliary/stats/'
 
@@ -133,6 +132,7 @@ for current_column in [(dataset[payment_type_property], "payment_type"), (datase
 
 #Traffic movement analysis
 
+<<<<<<< HEAD
 for zone in [("manhattan", manhattan_ids), ("bronx", bronx_ids), ("brooklyn", brooklyn_ids), ("queens", queens_ids), ("staten_island", staten_island_ids)]:
     zone_dataset = dataset.filter(dataset[pickup_location_id_property].isin(zone[1]))
     compute_dropoff_location_id_distribution(zone_dataset, results_folder + zone[0] + "_dropoff_location_id_dist.csv", True, clustered_analysis)
@@ -154,3 +154,11 @@ for zone in [("manhattan", manhattan_ids), ("bronx", bronx_ids), ("brooklyn", br
 #dataset.groupBy(pyspark.sql.functions.year(dataset[pickup_datetime_property])).avg(fare_amount_property).show(1000)
 #dataset.where(dataset[payment_type_property] == 1).groupBy(pyspark.sql.functions.year(dataset[pickup_datetime_property])).avg(tip_amount_property).show(1000)
 #dataset.where(dataset[payment_type_property] == 2).groupBy(pyspark.sql.functions.year(dataset[pickup_datetime_property])).avg(tip_amount_property).show(1000)
+
+#for zone in [("manhattan", manhattan_ids), ("bronx", bronx_ids), ("brooklyn", brooklyn_ids), ("queens", queens_ids), ("staten_island", staten_island_ids)]:
+#    zone_dataset = dataset.filter(dataset[pickup_location_id_property].isin(zone[1]))
+#    compute_dropoff_location_id_distribution(zone_dataset, results_folder + zone[0] + "_dropoff_location_id_dist.csv", True, clustered_analysis)
+#    compute_dropoff_location_by_pickup_hour_distribution(zone_dataset, results_folder + zone[0] + "_dropoff_location_id_by_pickup_hour_dist.csv", True, clustered_analysis)
+
+#Traffic movement analysis for building network graph
+#compute_pickup_location_and_dropoff_location_distribution_and_rank(dataset, results_folder + "pickup_location_and_dropoff_location_distribution.csv", True, clustered_analysis)

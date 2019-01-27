@@ -25,8 +25,8 @@ sc = pyspark.SparkContext()
 spark = SparkSession.builder.appName(appName).getOrCreate()
 
 
-dataset_folder = '/home/bigdata/auxiliary/'
-results_folder = '/home/bigdata/auxiliary/stats/'
+dataset_folder = '/media/luca/TOSHIBA EXT/BigData/datasets/'
+results_folder = '/media/luca/TOSHIBA EXT/BigData/datasets/stats/'
 
 #Whether to use the cleaned dataset or the uncleaned one
 clustered_dataset = True
@@ -134,3 +134,6 @@ else:
 #    zone_dataset = dataset.filter(dataset[pickup_location_id_property].isin(zone[1]))
 #    compute_dropoff_location_id_distribution(zone_dataset, results_folder + zone[0] + "_dropoff_location_id_dist.csv", True, clustered_analysis)
 #    compute_dropoff_location_by_pickup_hour_distribution(zone_dataset, results_folder + zone[0] + "_dropoff_location_id_by_pickup_hour_dist.csv", True, clustered_analysis)
+
+#Traffic movement analysis for building network graph
+#compute_pickup_location_and_dropoff_location_distribution_and_rank(dataset, results_folder + "pickup_location_and_dropoff_location_distribution.csv", True, clustered_analysis)

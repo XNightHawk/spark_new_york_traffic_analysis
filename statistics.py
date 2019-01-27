@@ -4,6 +4,7 @@ from pyspark.sql import SparkSession
 import pyspark.sql.functions
 from pyspark.sql.types import *
 from pyspark.sql.functions import *
+from pyspark.sql.window import Window
 
 import schema_conversion
 from schema import *
@@ -858,6 +859,26 @@ def compute_variance(dataset, result_filename, column, show=False, separe_cluste
 
     #Var[X] = E[X^2] - E[X]^2
     dataset = grouped_dataset.agg(mean(pow(column, 2)) - pow(mean(column), 2))
+
+    if show:
+        dataset.cache()
+
+    dataset.toPandas().to_csv(result_filename, header=True)
+
+    if show:
+        dataset.show()
+        dataset.unpersist()
+
+def compute_pickup_location_and_dropoff_location_distribution_and_rank(dataset, result_filename, show=False, separe_clusters=False):
+
+    if separe_clusters == False:
+        dataset = dataset.groupBy(pickup_location_id_property, dropoff_location_id_property).count()
+    else:
+        dataset = dataset.groupBy(pickup_location_id_property, dropoff_location_id_property,
+                                  clustering_class_property).count()
+
+    window = Window.partitionBy(dataset[pickup_location_id_property]).orderBy(dataset['count'].desc())
+    dataset = dataset.select('*', rank().over(window).alias('rank'))
 
     if show:
         dataset.cache()

@@ -975,7 +975,7 @@ def compute_trip_distance_by_company_distribution(dataset, result_filename, show
         dataset.show()
         dataset.unpersist()
 
-def compute_pickup_location_and_dropoff_location_distribution_and_rank(dataset, result_filename, show=False, separe_clusters=False):
+def compute_rank_by_pickup_location_and_dropoff_location(dataset, result_filename, show=False, separe_clusters=False):
 
     if separe_clusters == False:
         dataset = dataset.groupBy(pickup_location_id_property, dropoff_location_id_property).count()

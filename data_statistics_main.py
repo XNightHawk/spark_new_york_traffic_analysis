@@ -166,3 +166,8 @@ for zone in [("manhattan", manhattan_ids), ("bronx", bronx_ids), ("brooklyn", br
 
 # Traffic movement analysis for building network graph
 #compute_rank_by_pickup_location_and_dropoff_location(dataset, results_folder + "rank_by_pickup_location_and_dropoff_location.csv", True, clustered_analysis)
+
+compute_overall_pickups(dataset, results_folder + "overall_pickups.csv", True, clustered_analysis)
+compute_overall_dropoffs(dataset, results_folder + "overall_dropoffs.csv", True, clustered_analysis)
+compute_overall_fare_amount(dataset, results_folder + "overall_fare_amount.csv", True, clustered_analysis)
+compute_overall_total_amount(dataset, results_folder + "overall_total_amount.csv", True, clustered_analysis)

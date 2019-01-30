@@ -122,9 +122,20 @@ XXXXXXXXXXXXXXX Describe one by one
 Note that the common schema codifies the pickup and dropoff locations as the ids of the zone where the pickup or the dropoff happened and not as coordinates. The main challenge for schema conversion is the transformation of dropoff and pickup locations expressed as coordinates into the respective taxi zones. The dataset is accompanied by a shapefile which specifies the geographical boundaries of each zone. Unfortunately, naive algorithms for dataset conversion directly using the shapefile are able to only convert some tens of records per second per processor which would make the conversion of 1 Billion of records unfeasible. Instead, we decide to develop a more efficient algorithm for zone association which makes use of look up tables to increase the performance of the conversion up to the thousands of records per second, allowing the complete conversion of the dataset.
 
 \subsection{Coordinates to Zone conversion algorithm}
-XXXXX
 
-DIre che la dimensione e' 24GB.
+Until 2016, information about pickup and dropoff locations is represented through latitudes and longitudes expressed in the World Geodetic System (WGS) coordinate system. The need to have a consistent schema of the data through the years, led us to develop an efficient algorithm to convert the information about pickup and dropoff locations to numerical taxi zone identifiers. 
+
+According to the shapefile provided with the dataset, the city of New York is divided in 265 zones and the geometric locations, representing each of these zones, are expressed through the NAD83 / New York Long Island (ftUS) coordinate reference system. Our first attempt was to divide New York in a 1000x1000 lookup matrix in which each tile is delimited by some coordinates and consists of a list of possible zones contained in these boundaries. This has been achieved by including each shape record, representing a specific zone of New York, in the tiles forming the smallest rectangle delimiting the polygon constructed using the geometric shapes of that zone. Due to the lack of precision through which each zone is stored inside the tiles of the matrix, each tile may contain many zones.
+
+Given the latitude and the longitude of a location, after converting the data to the same coordinate reference system used in the shapefile, the numerical taxi zone identifier can be obtained by looking at the corresponding tile inside the lookup matrix and retrieving the shape record containing that point. As the conversion of an entire dataset possibily involves the scan of all the zones contained in the target tiles, the algorithm was still inefficient. The optimization that allowed us to speed up the procedure was to minimize the number of zones contained in each tile. This has been achieved by defining a set of probing points, such as the ones represented in figure \ref{fig:probing_points}, for checking which of the zones were actually contained inside each tile. This allowed us to create a refined lookup matrix which has a size of 24GB. To further reduce the time of execution of the algorithm, every time it finds a tile with more than one zone, it randomly chooses one.
+
+\begin{figure}
+	\centering
+	\includegraphics{resources/probing_points.pdf}
+	\caption{The probing points used for checking which zones are actually contained in a tile of the lookup matrix.}
+	\label{fig:probing_points}
+\end{figure}
+
 
 \section{Data cleaning}
 

@@ -31,7 +31,7 @@ results_folder = '/home/bigdata/auxiliary/stats/'
 clustered_dataset = True
 
 #Whether to perform a per cluster analysis or a global one
-clustered_analysis = False
+clustered_analysis = True
 
 #Build an entry for each archive to treat attaching the relative schema conversion routine to each one
 archives = []
@@ -64,6 +64,10 @@ if not clustered_dataset:
 
 else:
     dataset = spark.read.parquet('file://' + dataset_folder + 'clustered_dataset.parquet')
+
+
+#dataset.groupBy(vendor_id_property).count().show(1000)
+#dataset.groupBy(store_and_forward_flag_property).count().show(1000)
 
 #dataset.printSchema()
 #dataset.show()
@@ -160,5 +164,10 @@ for zone in [("manhattan", manhattan_ids), ("bronx", bronx_ids), ("brooklyn", br
 #    compute_dropoff_location_id_distribution(zone_dataset, results_folder + zone[0] + "_dropoff_location_id_dist.csv", True, clustered_analysis)
 #    compute_dropoff_location_by_pickup_hour_distribution(zone_dataset, results_folder + zone[0] + "_dropoff_location_id_by_pickup_hour_dist.csv", True, clustered_analysis)
 
-#Traffic movement analysis for building network graph
-#compute_pickup_location_and_dropoff_location_distribution_and_rank(dataset, results_folder + "pickup_location_and_dropoff_location_distribution.csv", True, clustered_analysis)
+# Traffic movement analysis for building network graph
+#compute_rank_by_pickup_location_and_dropoff_location(dataset, results_folder + "rank_by_pickup_location_and_dropoff_location.csv", True, clustered_analysis)
+
+compute_overall_pickups(dataset, results_folder + "overall_pickups.csv", True, clustered_analysis)
+compute_overall_dropoffs(dataset, results_folder + "overall_dropoffs.csv", True, clustered_analysis)
+compute_overall_fare_amount(dataset, results_folder + "overall_fare_amount.csv", True, clustered_analysis)
+compute_overall_total_amount(dataset, results_folder + "overall_total_amount.csv", True, clustered_analysis)

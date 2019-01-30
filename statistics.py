@@ -993,8 +993,7 @@ def compute_average_column_by_year(dataset, column_name, result_filename, show=F
 
         dataset.unpersist()
 
-
-def compute_pickup_location_and_dropoff_location_distribution_and_rank(dataset, result_filename, show=False, separe_clusters=False):
+def compute_rank_by_pickup_location_and_dropoff_location(dataset, result_filename, show=False, separe_clusters=False):
 
     if separe_clusters == False:
         dataset = dataset.groupBy(pickup_location_id_property, dropoff_location_id_property).count()
@@ -1015,4 +1014,71 @@ def compute_pickup_location_and_dropoff_location_distribution_and_rank(dataset, 
 
         dataset.unpersist()
 
+def compute_overall_pickups(dataset, result_filename, show=False, separe_clusters=False):
 
+    if separe_clusters == False:
+        dataset = dataset.groupBy(pyspark.sql.functions.year(dataset[pickup_datetime_property]).alias("year"), pyspark.sql.functions.dayofyear(dataset[pickup_datetime_property]).alias("day")).count()
+    else:
+        dataset = dataset.groupBy(pyspark.sql.functions.year(dataset[pickup_datetime_property]).alias("year"), pyspark.sql.functions.dayofyear(dataset[pickup_datetime_property]).alias("day"), dataset[clustering_class_property].alias("cluster")).count()
+
+    if show:
+        dataset.cache()
+
+    dataset.toPandas().to_csv(result_filename, header=True)
+
+    if show:
+        dataset.show()
+
+        dataset.unpersist()
+
+def compute_overall_dropoffs(dataset, result_filename, show=False, separe_clusters=False):
+
+    if separe_clusters == False:
+        dataset = dataset.groupBy(pyspark.sql.functions.year(dataset[dropoff_datetime_property]).alias("year"), pyspark.sql.functions.dayofyear(dataset[dropoff_datetime_property]).alias("day")).count()
+    else:
+        dataset = dataset.groupBy(pyspark.sql.functions.year(dataset[dropoff_datetime_property]).alias("year"), pyspark.sql.functions.dayofyear(dataset[dropoff_datetime_property]).alias("day"), dataset[clustering_class_property].alias("cluster")).count()
+
+    if show:
+        dataset.cache()
+
+    dataset.toPandas().to_csv(result_filename, header=True)
+
+    if show:
+        dataset.show()
+
+        dataset.unpersist()
+
+def compute_overall_fare_amount(dataset, result_filename, show=False, separe_clusters=False):
+
+    if separe_clusters == False:
+        dataset = dataset.groupBy(pyspark.sql.functions.year(dataset[pickup_datetime_property]).alias("year"), pyspark.sql.functions.dayofyear(dataset[pickup_datetime_property]).alias("day")).avg(fare_amount_property)
+    else:
+        dataset = dataset.groupBy(pyspark.sql.functions.year(dataset[pickup_datetime_property]).alias("year"), pyspark.sql.functions.dayofyear(dataset[pickup_datetime_property]).alias("day"), dataset[clustering_class_property].alias("cluster")).avg(fare_amount_property)
+
+    if show:
+        dataset.cache()
+
+    dataset.toPandas().to_csv(result_filename, header=True)
+
+    if show:
+        dataset.show()
+
+        dataset.unpersist()
+
+
+def compute_overall_total_amount(dataset, result_filename, show=False, separe_clusters=False):
+
+    if separe_clusters == False:
+        dataset = dataset.groupBy(pyspark.sql.functions.year(dataset[pickup_datetime_property]).alias("year"), pyspark.sql.functions.dayofyear(dataset[pickup_datetime_property]).alias("day")).avg(total_amount_property)
+    else:
+        dataset = dataset.groupBy(pyspark.sql.functions.year(dataset[pickup_datetime_property]).alias("year"), pyspark.sql.functions.dayofyear(dataset[pickup_datetime_property]).alias("day"), dataset[clustering_class_property].alias("cluster")).avg(total_amount_property)
+
+    if show:
+        dataset.cache()
+
+    dataset.toPandas().to_csv(result_filename, header=True)
+
+    if show:
+        dataset.show()
+
+        dataset.unpersist()

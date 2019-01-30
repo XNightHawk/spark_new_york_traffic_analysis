@@ -123,19 +123,20 @@ Note that the common schema codifies the pickup and dropoff locations as the ids
 
 \subsection{Coordinates to Zone conversion algorithm}
 
-Until 2016, information about pickup and dropoff locations is represented through latitudes and longitudes expressed in the World Geodetic System (WGS) coordinate system. The need to have a consistent schema of the data through the years, led us to develop an efficient algorithm to convert the information about pickup and dropoff locations to numerical taxi zone identifiers. 
+Until 2016, information about pickup and dropoff locations is represented through latitudes and longitudes expressed in the World Geodetic System (WGS) coordinate system. The need to have a consistent schema of the data through the years, lead us to develop an efficient algorithm to convert the information about pickup and dropoff locations to numerical taxi zone identifiers. 
 
-According to the shapefile provided with the dataset, the city of New York is divided in 265 zones and the geometric locations, representing each of these zones, are expressed through the NAD83 / New York Long Island (ftUS) coordinate reference system. Our first attempt was to divide New York in a 1000x1000 lookup matrix in which each tile is delimited by some coordinates and consists of a list of possible zones contained in these boundaries. This has been achieved by including each shape record, representing a specific zone of New York, in the tiles forming the smallest rectangle delimiting the polygon constructed using the geometric shapes of that zone. Due to the lack of precision through which each zone is stored inside the tiles of the matrix, each tile may contain many zones.
+According to the shapefile provided with the dataset, the city of New York is divided in 265 zones and the geometric locations, representing each of these zones, are expressed through the NAD83 / New York Long Island (ftUS) coordinate reference system. Our first attempt is to divide New York in a 1000x1000 lookup matrix in which each tile is delimited by some coordinates and consists of a list of possible zones contained in these boundaries. This is achieved by including each shape record, representing a specific zone of New York, in the tiles forming the smallest rectangle delimiting the polygon constructed using the geometric shapes of that zone. Due to the lack of precision through which each zone is stored inside the tiles of the matrix, each tile may contain many zones.
 
-Given the latitude and the longitude of a location, after converting the data to the same coordinate reference system used in the shapefile, the numerical taxi zone identifier can be obtained by looking at the corresponding tile inside the lookup matrix and retrieving the shape record containing that point. As the conversion of an entire dataset possibily involves the scan of all the zones contained in the target tiles, the algorithm was still inefficient. The optimization that allowed us to speed up the procedure was to minimize the number of zones contained in each tile. This has been achieved by defining a set of probing points, such as the ones represented in figure \ref{fig:probing_points}, for checking which of the zones were actually contained inside each tile. This allowed us to create a refined lookup matrix which has a size of 24GB. To further reduce the time of execution of the algorithm, every time it finds a tile with more than one zone, it randomly chooses one.
+Given the latitude and the longitude of a location, after converting the data to the same coordinate reference system used in the shapefile, the numerical taxi zone identifier can be obtained by looking at the corresponding tile inside the lookup matrix and retrieving the shape record containing that point. As the conversion of an entire dataset possibily involves the scan of all the zones contained in the target tiles, the algorithm is still inefficient. The optimization that allows us to speed up the procedure is to minimize the number of zones contained in each tile. This is achieved by defining a set of probing points, such as the ones represented in fig. \ref{fig:probingPoints}, for checking which of the zones are actually contained inside each tile. This allows us to create a refined lookup matrix. To further reduce the time of execution of the algorithm, every time it finds a tile with more than one zone, it randomly chooses one. 
+
+The dataset resulting from the conversion of the coordinates has a size of 24GB.
 
 \begin{figure}
 	\centering
 	\includegraphics{resources/probing_points.pdf}
 	\caption{The probing points used for checking which zones are actually contained in a tile of the lookup matrix.}
-	\label{fig:probing_points}
+	\label{fig:probingPoints}
 \end{figure}
-
 
 \section{Data cleaning}
 
@@ -316,6 +317,46 @@ By looking at the distribution of payment types during the years in \cref{fig:pa
 As a last general remark we note that the distribution of tolls amount as shown in \cref{fig:tollsAmountDistr} is bimodal, with the first mode at 0\$ and a smaller mode at 5\$, representing the fact that the majority of trips are not subject to tolls, while the one that are pay on average 5\$ of tolls. These corresponds to tolls for Queens-Midtown Tunnel, Brooklyn-Battery Tunnel and the Triboro Bridge, which are convenient ways to avoid traffic for reaching the various parts of Manhattan from Brooklyn and Queens.
 
 \section{Traffic segmentation}
+
+After the data cleaning and preliminary analysis phase, the identification of the different categories of trips is achieved through k-means clustering. In order to prepare the data for the building model phase, the following steps are performed:
+
+\begin{itemize}
+	\item the string column containing the taxi company is encoded to a column of label indices named taxi\_company\_indexed\_encoded
+	\item the pickup and dropoff datetime are encoded to 3 new features: pickup\_hour, dropoff\_hour, weekend
+	\item from the information about the distance, the pickup and the dropoff datetime of the trip, the speed property is extracted
+	\item a one-hot encoder is used to map each of the following columns of category indices: taxi\_company\_indexed\_encoded, ratecode\_id and payment\_type to a column of binary vectors, with at most a single one-value per row that specifies the input category index
+	\item the different features resulted from the one-hot encoding of the previous step and other raw features are combined into a single feature vector called partial\_features
+	\item the different features generated by the previous feature transformers (except one-hot encoded features) and other raw features are combined into a single feature vector called unscaled\_features\_vector
+	\item the unscaled\_features\_vector is scaled to have unit standard deviation and zero mean features. The resulting feature is called scaled\_features\_vector
+	\item partial\_features and scaled\_features\_vector are combined into a single feature vector called clustering\_features that is used as feature vector for the k-means clustering algorithm
+\end{itemize}  
+
+The columns containing the ids of the zone where the pickup or the dropoff happened are not included in the building model phase because we do not want the model to use them as distinguishing criteria. The objective is to find the different types of traffic of the entire city, not the types of traffic of a certain zone.
+
+The appropriate number of clusters for the k-means clustering algorithm is detected using the Elbow method. For our dataset, the number of clusters chosen is 4. By looking at \cref{fig:FareAmountDistr} and \cref{fig:TripDistanceDistr} it can be noted that the clustering is done according to fare\_amount and trip\_distance features. More precisely, the group 0 identifies low fare amounts and very small distance trips, the group 1 identifies very high fare amount and long distance trips, the group 2 identifies high fare amount and medium distance trips and the group 3 identifies moderate fare amount and small distance trips. Further analysis show that the average speed differs from one cluster to another, it is higher for long distance trips than for small distance trips. In addition, tips are on average higher for trips of group 0 than for the other types of trips. An analysis of the types of payments through the years per cluster, highlights that trips of group 1 are paid with higher percentage of cases with credit cards than trips of other groups. Moreover, while expensive trips remain costant through the week, inexpensive trips increase during the weekend.
+
+\begin{figure}
+	\centering
+	\includegraphics[width=1\columnwidth]{resources/clustered_plots/fare_amount_distr.pdf}
+	\caption{Distribution of fare amounts per cluster.}
+	\label{fig:FareAmountDistr}
+\end{figure}
+
+\begin{figure}
+	\centering
+	\includegraphics[width=1\columnwidth]{resources/clustered_plots/trip_distance_distr.pdf}
+	\caption{Distribution of trip distances per cluster.}
+	\label{fig:TripDistanceDistr}
+\end{figure}
+
+\cref{fig:TrafficGraphWithLegend} shows the network graph constructed for better visualize the different types of traffic inside the city of New York. Each node represents one of the 265 zones of New York, while each edge represents a traffic flow from a starting zone to a destination zone. The colour of the nodes depend on the borough to which they belong, while the colour of the edges depend on the cluster to which they belong. An important aspect to note is that the number of edges starting from a node is variable and depends on the number of pickups per that zone. In addition, each node has a set of attributes, whose value can be LOW, MEDIUM and HIGH, describing the level of activity, the level of distance, the level of duration, the level of speed and the level of total amount of that zone. For each of these attributes, the values are calculated by finding the first and third quartiles of the corresponding distribution. The value of a given attribute for a node is considered LOW if the value of the node lies below the 25\% of the data in the dataset, MEDIUM if the value of the node lies between the 25\% and the 75\%, and HIGH if the value of the node lies above the 75\% of the data in the dataset. By looking at the graph it can be noted that the clustering found as group 1 the traffic to the JFK airport and as group 2 the traffic to the LaGuardia airport. For a better visualization of the network graph, please refer to the interactive version of the graph and its legend that can be found on traffic\_graph.zip. 
+
+\begin{figure}
+	\centering
+	\includegraphics[width=1\columnwidth]{resources/traffic_graph_with_legend.png}
+	\caption{Network graph showing the different types of traffic found using k-means clustering.}
+	\label{fig:TrafficGraphWithLegend}
+\end{figure}
 
 \section{Traffic flow analysis}
 

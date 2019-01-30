@@ -37,12 +37,12 @@ def cluster(dataset, spark, max_clusters = 5, max_iterations = 40, clustering_pr
 
     pickup_hour_extractor = SQLTransformer(statement = "SELECT *, HOUR(" + pickup_datetime_property + ") AS " + pickup_hour_property + " FROM __THIS__")
     dropoff_hour_extractor = SQLTransformer(statement = "SELECT *, HOUR(" + dropoff_datetime_property + ") AS " + dropoff_hour_property + " FROM __THIS__")
-    weekend_extractor = SQLTransformer(statement = "SELECT *, (DAYOFWEEK(" + pickup_datetime_property + ") == 6 OR DAYOFWEEK(" + pickup_datetime_property + ") == 5) AS " + weekend_property + " FROM __THIS__")
+    weekend_extractor = SQLTransformer(statement = "SELECT *, (DAYOFWEEK(" + pickup_datetime_property + ") == 6 OR DAYOFWEEK(" + pickup_datetime_property + ") == 5 OR DAYOFWEEK(" + pickup_datetime_property + ") == 7) AS " + weekend_property + " FROM __THIS__")
 
     speed_extractor = SQLTransformer(statement = "SELECT *, (" + trip_distance_property + " / (timestamp_diff(" + dropoff_datetime_property + ", " + pickup_datetime_property + ") / 1000)) AS " + speed_property + " FROM __THIS__")
 
     one_hot_encoder = OneHotEncoderEstimator(inputCols=[taxi_company_indexed_property, ratecode_id_property, payment_type_property], outputCols=[taxi_company_encoded_property, ratecode_id_encoded_property, payment_type_encoded_property], handleInvalid='keep')
-    vector_assembler = VectorAssembler(inputCols=[taxi_company_indexed_property, passenger_count_property, trip_distance_property, ratecode_id_encoded_property, fare_amount_property, tolls_amount_property, payment_type_encoded_property, weekend_property], outputCol=partial_clustering_features_property)
+    vector_assembler = VectorAssembler(inputCols=[taxi_company_indexed_property, ratecode_id_encoded_property, payment_type_encoded_property, weekend_property], outputCol=partial_clustering_features_property)
 
     unscaled_vector_assembler = VectorAssembler(inputCols=[passenger_count_property, trip_distance_property, fare_amount_property, tolls_amount_property, pickup_hour_property, dropoff_hour_property, speed_property], outputCol=unscaled_vector_property)
     scaler = StandardScaler(inputCol=unscaled_vector_property, outputCol=scaled_vector_property, withStd=True, withMean=True)
@@ -141,18 +141,19 @@ spark.udf.register("timestamp_diff", timestamp_diff, IntegerType())
 #dataset.show()
 
 #Obtained that the best 4 for the current dataset is k=4
-#k_results = compute_k_elbow(dataset, spark, results_folder, k_from=2, k_to=20, step_size=1, training_fraction=0.025)
+k_results = compute_k_elbow(dataset, spark, results_folder, k_from=4 , k_to=20, step_size=1, training_fraction=0.025)
 
 clustering_training_dataset = dataset.sample(0.03)
 
 '''
+
 clustering_model = cluster(clustering_training_dataset, spark, max_clusters = 4, max_iterations = 40, clustering_prediction_property = clustering_class_property)
 
 try:
     clustering_model.save('file://' + dataset_folder + 'clustering_model.model')
 except:
     print("Clustering model already exists. Continuing without saving")
-'''
+
 
 clustering_model = PipelineModel.load('file://' + dataset_folder + 'clustering_model.model')
 
@@ -174,3 +175,4 @@ clustered_dataset = clustered_dataset.drop(partial_clustering_features_property)
 clustered_dataset = clustered_dataset.drop(clustering_features_property)
 
 clustered_dataset.write.parquet('file://' + dataset_folder + 'clustered_dataset.parquet')
+'''

@@ -31,7 +31,7 @@ results_folder = '/home/bigdata/auxiliary/stats/'
 clustered_dataset = True
 
 #Whether to perform a per cluster analysis or a global one
-clustered_analysis = True
+clustered_analysis = False
 
 #Build an entry for each archive to treat attaching the relative schema conversion routine to each one
 archives = []

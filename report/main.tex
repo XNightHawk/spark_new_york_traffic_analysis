@@ -125,16 +125,16 @@ Note that the common schema codifies the pickup and dropoff locations as the ids
 
 Until 2016, information about pickup and dropoff locations is represented through latitudes and longitudes expressed in the World Geodetic System (WGS) coordinate system. The need to have a consistent schema of the data through the years, lead us to develop an efficient algorithm to convert the information about pickup and dropoff locations to numerical taxi zone identifiers. 
 
-According to the shapefile provided with the dataset, the city of New York is divided in 265 zones and the geometric locations, representing each of these zones, are expressed through the NAD83 / New York Long Island (ftUS) coordinate reference system. Our first attempt is to divide New York in a 1000x1000 lookup matrix in which each tile is delimited by some coordinates and consists of a list of possible zones contained in these boundaries. This is achieved by including each shape record, representing a specific zone of New York, in the tiles forming the smallest rectangle delimiting the polygon constructed using the geometric shapes of that zone. Due to the lack of precision through which each zone is stored inside the tiles of the matrix, each tile may contain many zones.
+According to the shapefile provided with the dataset, the city of New York is divided in 265 zones and the geometric locations, representing each of these zones, are expressed through the NAD83 / New York Long Island (ftUS) coordinate reference system. Our first attempt is to divide New York in a 1000x1000 lookup matrix in which each tile is delimited by some coordinates and is associated with a list of possible zones which are present in these boundaries. This is achieved by including each shape record, representing a specific zone of New York, in the tiles forming the smallest rectangle surrounding that zone. Due to this coarse approximation, each tile may contain many zones.
 
-Given the latitude and the longitude of a location, after converting the data to the same coordinate reference system used in the shapefile, the numerical taxi zone identifier can be obtained by looking at the corresponding tile inside the lookup matrix and retrieving the shape record containing that point. As the conversion of an entire dataset possibily involves the scan of all the zones contained in the target tiles, the algorithm is still inefficient. The optimization that allows us to speed up the procedure is to minimize the number of zones contained in each tile. This is achieved by defining a set of probing points, such as the ones represented in fig. \ref{fig:probingPoints}, for checking which of the zones are actually contained inside each tile. This allows us to create a refined lookup matrix. To further reduce the time of execution of the algorithm, every time it finds a tile with more than one zone, it randomly chooses one. 
+Given the latitude and the longitude of a location in the correct coordinate system, the numerical taxi zone identifier can be obtained by looking at the corresponding tile inside the lookup matrix, scanning each contained shape and retrieving the shape record containing that point. This algorithm is a notable improvement over the naive method, being able to convert some hundreds of records per second for each processor, but still does not allow for the conversion of the whole dataset. The main problem is the need to still linearly search through a list of shapes, although its average length is considerably reduced with respect to the naive implementation. The optimization that allows us to reach the target performance is to refine the coarse list of possible zones for each tile until the point where we directly associate each matrix tile with a unique zone id instead of a list of possible zones. This is possible because by using a 1000x1000 lookup matrix each tile corresponds to a rectangular region of circa 70x70m, which is granular enough to be associated with a single zone even in the case where it lies across zone boundaries. This zone refinement is achieved by defining a set of probing points, such as the ones represented in fig. \ref{fig:probingPoints}, and checking which zones in the coarse list for the current tile actually contain at least one of the probing points. Whenever a tile is associated with more than one zone even with this refinement, we randomly choose only one for performance reasons. Due to the high matrix granularity, this situation occurs in a minority of regions and when it happens it causes tolerable approximation. The performance achieved through this optimization allows for the conversion of roughly 4000 records per core per second, which makes it possible for an 8 thread processor to convert the whole dataset overnight.
 
-The dataset resulting from the conversion of the coordinates has a size of 24GB.
+The dataset in common format for years 2010 to 2018 resulting from the conversion has a size of 24GB.
 
 \begin{figure}
 	\centering
 	\includegraphics{resources/probing_points.pdf}
-	\caption{The probing points used for checking which zones are actually contained in a tile of the lookup matrix.}
+	\caption{The probing points for a single tile used for checking which zones are actually contained in it. dx and dy, the width and height of each tile, correspond to approximately 70m.}
 	\label{fig:probingPoints}
 \end{figure}
 
@@ -318,22 +318,32 @@ As a last general remark we note that the distribution of tolls amount as shown 
 
 \section{Traffic segmentation}
 
-After the data cleaning and preliminary analysis phase, the identification of the different categories of trips is achieved through k-means clustering. In order to prepare the data for the building model phase, the following steps are performed:
+After the data cleaning and preliminary analysis phase, we decide to perform a characterization of the different types of trips through k-means clustering. In order to perform an effective clustering we introduce new features to the dataset and manipulate existing ones in order to guide the model towards finding interesting trends in the data. The following features are given to the clustering algorithm:
 
 \begin{itemize}
-	\item the string column containing the taxi company is encoded to a column of label indices named taxi\_company\_indexed\_encoded
-	\item the pickup and dropoff datetime are encoded to 3 new features: pickup\_hour, dropoff\_hour, weekend
-	\item from the information about the distance, the pickup and the dropoff datetime of the trip, the speed property is extracted
-	\item a one-hot encoder is used to map each of the following columns of category indices: taxi\_company\_indexed\_encoded, ratecode\_id and payment\_type to a column of binary vectors, with at most a single one-value per row that specifies the input category index
-	\item the different features resulted from the one-hot encoding of the previous step and other raw features are combined into a single feature vector called partial\_features
-	\item the different features generated by the previous feature transformers (except one-hot encoded features) and other raw features are combined into a single feature vector called unscaled\_features\_vector
-	\item the unscaled\_features\_vector is scaled to have unit standard deviation and zero mean features. The resulting feature is called scaled\_features\_vector
-	\item partial\_features and scaled\_features\_vector are combined into a single feature vector called clustering\_features that is used as feature vector for the k-means clustering algorithm
+	\item taxi company, boolean field representing whether the trip was served by yellow or green taxis
+	\item pickup hour and dropoff hour, scaled integer field representing the hour of pickup and dropoff
+	\item weekend, boolean field set to true if the trip happened during the weekend
+	\item passenger count, scaled numerical field representing the number of passengers
+	\item speed, scaled numerical field representing average speed
+	\item distance, scaled numerical field representing metered distance
+	\item ratecode id, one hot encoded field representing the used ratecode
+	\item fare amount, scaled numerical field representing metered fare
+	\item tolls amount, scaled numerical field representing the incurred tolls
+	\item payment type, one hot encoded field representing the payment method
+	
 \end{itemize}  
 
-The columns containing the ids of the zone where the pickup or the dropoff happened are not included in the building model phase because we do not want the model to use them as distinguishing criteria. The objective is to find the different types of traffic of the entire city, not the types of traffic of a certain zone.
+Note that, as our objective is to find a global characterization of trip types which possible span the entire city, we do not include pickup and dropoff zone ids as clustering features, because this would cause the algorithm to divide trips based on their starting or ending point which does not carry useful information.
 
-The appropriate number of clusters for the k-means clustering algorithm is detected using the Elbow method. For our dataset, the number of clusters chosen is 4. By looking at \cref{fig:FareAmountDistr} and \cref{fig:TripDistanceDistr} it can be noted that the clustering is done according to fare\_amount and trip\_distance features. More precisely, the group 0 identifies low fare amounts and very small distance trips, the group 1 identifies very high fare amount and long distance trips, the group 2 identifies high fare amount and medium distance trips and the group 3 identifies moderate fare amount and small distance trips. Further analysis show that the average speed differs from one cluster to another, it is higher for long distance trips than for small distance trips. In addition, tips are on average higher for trips of group 0 than for the other types of trips. An analysis of the types of payments through the years per cluster, highlights that trips of group 1 are paid with higher percentage of cases with credit cards than trips of other groups. Moreover, while expensive trips remain costant through the week, inexpensive trips increase during the weekend.
+\begin{figure}
+	\centering
+	\includegraphics[width=1\columnwidth]{resources/clustered_plots/elbow.pdf}
+	\caption{Representation of clustering error as a function of the number of clusters k. For k=5 we note that the error curve starts flattening, so 5 is chosen as the optimal k value.}
+	\label{fig:elbow}
+\end{figure}
+
+The appropriate number of clusters for the k-means clustering algorithm is detected using the Elbow method, which results are shown in \cref{fig:elbow}. For our dataset, the number of clusters chosen is 5. By looking at \cref{fig:FareAmountDistr} and \cref{fig:TripDistanceDistr} it can be noted that the clustering is done according to fare\_amount and trip\_distance features. More precisely, the group 0 identifies low fare amounts and very small distance trips, the group 1 identifies very high fare amount and long distance trips, the group 2 identifies high fare amount and medium distance trips and the group 3 identifies moderate fare amount and small distance trips. Further analysis show that the average speed differs from one cluster to another, it is higher for long distance trips than for small distance trips. In addition, tips are on average higher for trips of group 0 than for the other types of trips. An analysis of the types of payments through the years per cluster, highlights that trips of group 1 are paid with higher percentage of cases with credit cards than trips of other groups. Moreover, while expensive trips remain costant through the week, inexpensive trips increase during the weekend.
 
 \begin{figure}
 	\centering

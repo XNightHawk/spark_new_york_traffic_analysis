@@ -19,8 +19,7 @@
 %\crdata{0-12345-67-8/90/01}  % Allows default copyright data (X-XXXXX-XX-X/XX/XX) to be over-ridden.
 % --- End of Author Metadata ---
 
-\title{A Sample {\ttlit ACM} SIG Proceedings Paper in LaTeX
-Format\titlenote{(Produces the permission block, copyright information and page numbering). For use with ACM\_PROC\_ARTICLE-SP.CLS V2.6SP. Supported by ACM.}}
+\title{Understanding the NYC Taxi Service}
 %
 % You need the command \numberofauthors to handle the "boxing"
 % and alignment of the authors under the title, and to add
@@ -62,23 +61,13 @@ Format\titlenote{(Produces the permission block, copyright information and page 
 
 \maketitle
 \begin{abstract}
-This paper provides a sample of a \LaTeX\ document which conforms to
-the formatting guidelines for ACM SIG Proceedings.
-It complements the document \textit{Author's Guide to Preparing
-ACM SIG Proceedings Using \LaTeX$2_\epsilon$\ and Bib\TeX}. This
-source file has been written with the intention of being
-compiled under \LaTeX$2_\epsilon$\ and BibTeX.
+	
+Big Data is rapidly becoming a predominant field in ICT. Its importance is continuously growing due to the huge volume and variety of available data. In this work we try to exploit its descriptive and predictive power in order to better comprehend the evolution and current state of the taxi service in New York City, leveraging the service data that the NYC Taxi and Limousine Commission (TLC) made publicly available.
 
-The developers have tried to include every imaginable sort
-of ``bells and whistles", such as a subtitle, footnotes on
-title, subtitle and authors, as well as in the text, and
-every optional component (e.g. Acknowledgments, Additional
-Authors, Appendices), not to mention examples of
-equations, theorems, tables and figures.
+We analyze a wide spectrum of views, starting with a general overview of the service evolution in time and confronting it with with the emerging phenomenon of ride-hailing applications such as Uber, Juno and Lyft. We then proceed to perform a segmentation of the traffic in order to understand better the characterization of taxi customers and later continue by analyzing subjects such as movement patterns of traffic, competition between yellow and green taxis and characteristics of airport traffic.
 
-To make best use of this sample document, run it through \LaTeX\
-and BibTeX, and compare this source code with the printed
-output produced by the dvi file.
+The results we present should help the reader understand the main trends and characteristics of the taxi service, which may suggest ways to increase the quality and popularity of the service.
+
 \end{abstract}
 
 \section{Introduction}
@@ -98,25 +87,23 @@ After acquisition of the data we proceed to compress it to .tar.gz format in ord
 
 The parquet dataset is then transformed into a common schema format to uniform the data and ease the analysis. We decide to adopt the following schema
 
-XXXXXXXXXXXXXXX Describe one by one
-
 \begin{itemize}
-	\item taxi\_company
-	\item pickup\_datetime
-	\item dropoff\_datetime
-	\item pickup\_location\_id
-	\item dropoff\_location\_id
-	\item passenger\_count
-	\item trip\_distance
-	\item ratecode\_id
-	\item fare\_amount
-	\item tolls\_amount
-	\item total\_amount
-	\item mta\_tax
-	\item improvement\_surcharge
-	\item extra
-	\item tip\_amount
-	\item payment\_type
+	\item taxi\_company, "Green" or "Yellow" according to the taxi type that served the trip
+	\item pickup\_datetime, date and time of the pickup
+	\item dropoff\_datetime, date and time of the dropoff
+	\item pickup\_location\_id, taxi zone id where the pickup happened, -1 if the zone is unknown
+	\item dropoff\_location\_id, taxi zone id where the dropoff happened, -1 if the zone is unknown
+	\item passenger\_count, number of passengers onboard
+	\item trip\_distance, the metered distance in miles
+	\item ratecode\_id, the fare rate used for the calculation of the amount which includes special rates for JFK or Newark trips.
+	\item fare\_amount, the fare amount for the trip in \$
+	\item tolls\_amount, the amount due to tolls in \$
+	\item total\_amount, the total amount for the trip in \$. It includes tips only for credit card payments.
+	\item mta\_tax, the amount due to MTA tax in \$
+	\item improvement\_surcharge, the amount due to the improvement surcharge in \$
+	\item extra, the amount due to extra in \$ including only rush hour and overnight charges
+	\item tip\_amount, the tip amount in \$. It is set only for credit card payments
+	\item payment\_type, the used payment method
 \end{itemize}
 
 Note that the common schema codifies the pickup and dropoff locations as the ids of the zone where the pickup or the dropoff happened and not as coordinates. The main challenge for schema conversion is the transformation of dropoff and pickup locations expressed as coordinates into the respective taxi zones. The dataset is accompanied by a shapefile which specifies the geographical boundaries of each zone. Unfortunately, naive algorithms for dataset conversion directly using the shapefile are able to only convert some tens of records per second per processor which would make the conversion of 1 Billion of records unfeasible. Instead, we decide to develop a more efficient algorithm for zone association which makes use of look up tables to increase the performance of the conversion up to the thousands of records per second, allowing the complete conversion of the dataset.
@@ -144,10 +131,6 @@ An analysis of the dataset in the common format highlights data quality problems
 Null entries are a minority of the dataset, so we decide to drop every entry in the dataset with a null attribute. Every categorical feature is then enforced to assume a value in its set of legal values. In particular, location ids are enforced to be valid ids and each entry for which our coordinate conversion algorithm was not able to identify a correspondent taxi zone is dropped. We then plot the distribution of the values of each numerical feature and conservatively identify a point in its tail after which all entries are dropped, for example tolls amounts greater than 120\$ are discarded because very irrealistic according to the distribution of the tolls and probably symptom of poor data quality. We also conservatively drop entries for which the duration is greater than 24 hours or for which the year is not in the range from 2010 to 2018.
 
 The resulting dataset contains 1.07 Billion entries versus the original 1.38 Billion entries and the size of the dataset reduced to 20GB.
-
-%1376582531 initial entries
-%1077952992 final entries
-
 
 \section{Preliminary analysis}
 \label{sec:preliminaryAnalysis}
@@ -343,21 +326,61 @@ Note that, as our objective is to find a global characterization of trip types w
 	\label{fig:elbow}
 \end{figure}
 
-The appropriate number of clusters for the k-means clustering algorithm is detected using the Elbow method, which results are shown in \cref{fig:elbow}. For our dataset, the number of clusters chosen is 5. By looking at \cref{fig:FareAmountDistr} and \cref{fig:TripDistanceDistr} it can be noted that the clustering is done according to fare\_amount and trip\_distance features. More precisely, the group 0 identifies low fare amounts and very small distance trips, the group 1 identifies very high fare amount and long distance trips, the group 2 identifies high fare amount and medium distance trips and the group 3 identifies moderate fare amount and small distance trips. Further analysis show that the average speed differs from one cluster to another, it is higher for long distance trips than for small distance trips. In addition, tips are on average higher for trips of group 0 than for the other types of trips. An analysis of the types of payments through the years per cluster, highlights that trips of group 1 are paid with higher percentage of cases with credit cards than trips of other groups. Moreover, while expensive trips remain costant through the week, inexpensive trips increase during the weekend.
+%Iniziare facendo vedere gli orari, il ratecode e il numero di passeggeri per dire come e' stato segmentato
+
+%il traffico di giorno e' stato l'ultimo ad abbandonare Contanti, aeroporto e' stato il primo
+%Airport does the most long distance traffic. Morning and Evening are heavytail distance
+%This reflects in higher fare amounts for those
+%Mostrare che i tolls sono tutti per l'aeroporto
+%Mostrare il pickup day che nel weekend i notturni aumentano
+%Nulla di interessante sulle mappe
 
 \begin{figure}
 	\centering
-	\includegraphics[width=1\columnwidth]{resources/clustered_plots/fare_amount_distr.pdf}
-	\caption{Distribution of fare amounts per cluster.}
-	\label{fig:FareAmountDistr}
+	\includegraphics[width=1\columnwidth]{resources/clustered_plots/pickup_hour_dist.pdf}
+	\caption{Number of pickups by day hour and cluster. Notice how clusters 1, 4 and 2 are determined based on the pickup hour.}
+	\label{fig:clusterPickupHour}
 \end{figure}
-
+\begin{figure}
+	\centering
+	\includegraphics[width=1\columnwidth]{resources/clustered_plots/ratecode_distr.pdf}
+	\caption{Distribution ratecodes divided by cluster. Notice how the majority of JFK trips are grouped in cluster 3.}
+	\label{fig:clusterRatecode}
+\end{figure}
 \begin{figure}
 	\centering
 	\includegraphics[width=1\columnwidth]{resources/clustered_plots/trip_distance_distr.pdf}
-	\caption{Distribution of trip distances per cluster.}
-	\label{fig:TripDistanceDistr}
+	\caption{Distribution of trip distance divided by cluster. Notice the modes for cluster 3 at 9 and 17 miles which corresponds respectively to trips to LaGuardia and JFK airport.}
+	\label{fig:clusterDistance}
 \end{figure}
+\begin{figure}
+	\centering
+	\includegraphics[width=1\columnwidth]{resources/clustered_plots/passenger_count_distr.pdf}
+	\caption{Distribution of fare amounts per cluster.}
+	\label{fig:clusterPassengerDistr}
+\end{figure}
+
+\begin{figure}
+	\centering
+	\includegraphics[width=1\columnwidth]{resources/clustered_plots/payment_type_distr.pdf}
+	\caption{Distribution of fare amounts per cluster.}
+	\label{fig:clusterPaymentType}
+\end{figure}
+
+\begin{figure}
+	\centering
+	\includegraphics[width=1\columnwidth]{resources/clustered_plots/pickup_weekday_dist.pdf}
+	\caption{Distribution of fare amounts per cluster.}
+	\label{fig:clusterPickupDay}
+\end{figure}
+
+
+The appropriate number of clusters for the k-means clustering algorithm is detected using the Elbow method, which results are shown in \cref{fig:elbow}. For our dataset, the procedure suggested a number of cluster equal to 5. 
+
+We then proceed to identify the characteristics of each of these 5 identified clusters. By looking at \cref{fig:clusterPickupHour}, we notice that cluster 1 corresponds to early morning trips done from 0 until 7, cluster 4 corresponds to day trip from 8 to 15 and cluster 2 corresponds to trip from 16 to 24. Furthermore, from \cref{fig:clusterRatecode} it can be seen that cluster 3 comprehends trips to JFK and Newark airports. By looking at \cref{fig:clusterDistance} and by plotting the pickup locations on a map as a function of the cluster we can also say that cluster 3 comprehends trips to LaGuardia airport. Lastly, by looking at \cref{fig:clusterPassengerDistr} we can see that cluster 0 corresponds to trips performed by groups of 4 or more people. We note also that cluster 1 and 2 that represent respectively early morning and night trips could be unified in a single cluster with common characteristics. The only reason why our clustering algorithm separated them is that the pickup and dropoff hour property cause trips in the evening to have a high distance measure from trips in the morning, while a more reasonable distance metric would assign to trips in the evening and trip in the morning a smaller distance.
+
+By looking further into the data we can notice from \cref{fig:clusterDistance} that day trips in cluster 2 tend to have a light tail, compared to heavy tails of clusters for morning and night trips and for group rides. This difference is probably explained by the fact that people tend to use taxis also for long and expensive trips at nights where the availability of other means of transport is reduced. From \cref{fig:clusterPaymentType} it can be noted that group rides and day trips tend to have a lower CC to Cash payment ratios, while airport trips, morning trips and night trips tent to be paid with credit card more frequently. It is also interesting to notice how these type of traffics vary through the week as shown in \cref{fig:clusterPickupDay}. Day trips tend to have their peak on Thursday and have lower activity along the weekend. On the other hand group rides, morning trips and evening trips tend to peak in the weekend, probably because of the increased nightlife. Airport trips on the other hand have their peak on Monday and register their lowest point on Sunday.
+
 
 \cref{fig:TrafficGraphWithLegend} shows the network graph constructed for better visualize the different types of traffic inside the city of New York. Each node represents one of the 265 zones of New York, while each edge represents a traffic flow from a starting zone to a destination zone. The colour of the nodes depend on the borough to which they belong, while the colour of the edges depend on the cluster to which they belong. An important aspect to note is that the number of edges starting from a node is variable and depends on the number of pickups per that zone. In addition, each node has a set of attributes, whose value can be LOW, MEDIUM and HIGH, describing the level of activity, the level of distance, the level of duration, the level of speed and the level of total amount of that zone. For each of these attributes, the values are calculated by finding the first and third quartiles of the corresponding distribution. The value of a given attribute for a node is considered LOW if the value of the node lies below the 25\% of the data in the dataset, MEDIUM if the value of the node lies between the 25\% and the 75\%, and HIGH if the value of the node lies above the 75\% of the data in the dataset. By looking at the graph it can be noted that the clustering found as group 1 the traffic to the JFK airport and as group 2 the traffic to the LaGuardia airport. For a better visualization of the network graph, please refer to the interactive version of the graph and its legend that can be found on traffic\_graph.zip. 
 
@@ -524,16 +547,10 @@ From \cref{fig:airportPickupHourDistr} we can look at the number of trips as a f
 As a last remark, by looking at the distribution of tolls amount in \cref{fig:airportTollsAmount} we notice that the number of trips subject to tolls is the majority with respect to the total number of trips. By comparing it with \cref{fig:tollsAmountDistr} we see that airport trips are responsible for the majority of trips that were subject to tolls.
 
 \section{Conclusions}
-This paragraph will end the body of this sample document.
-Remember that you might still have Acknowledgments or
-Appendices; brief samples of these
-follow.  There is still the Bibliography to deal with; and
-we will make a disclaimer about that here: with the exception
-of the reference to the \LaTeX\ book, the citations in
-this paper are to articles which have nothing to
-do with the present subject and are used as
-examples only.
 
+In this paper we presented an overview of many aspects of the NYC taxi service, starting from an high level description and later proceeding more in depth in some selected topics. We highlighted some of the service's problems such as the concentration of yellow taxis in Manhattan and the airports which creates a difficulty for passengers of outer boroughs to find hails despite the introduction of green taxis, the increasing trend of fare amounts and the problematic level of city traffic which causes very low average moving speeds. It is our opinion that these and other factors such as the historically inadequate number of yellow taxi Medallions and problems in the public transport infrastructure play an important role in the success of ride hailing applications such as Uber which are experiencing huge gains in popularity, threatening the position of the taxi service.
+
+Further topics of interest which have not been analyzed at the moment include a study of weekend traffic which seems to have peculiar characteristics, study of the effects of weather events on the taxi service, studies regarding the popularity of local businesses such as bars, clubs and pubs in the different zones of the city or a series of studies regarding the movement of employees of certain companies such as Accenture, the Goldman Sachs Group or American Express which could give a picture of where the wealthiest part of the population lives in the city.
 
 %
 % The following two commands are all you need in the

@@ -6,10 +6,9 @@
 \usepackage{cleveref}
 \usepackage{float}
 \usepackage{subfig}
+\usepackage{url}
 
 \begin{document}
-
-
 
 %
 % --- Author Metadata here ---
@@ -20,10 +19,6 @@
 % --- End of Author Metadata ---
 
 \title{Understanding the NYC Taxi Service}
-%
-% You need the command \numberofauthors to handle the "boxing"
-% and alignment of the authors under the title, and to add
-% a section for authors number 4 through n.
 
 \numberofauthors{2}
 
@@ -79,25 +74,25 @@ The main technology enabling the analysis of such dataset is Apache Spark, coupl
 
 \section{Data Acquisition and compression}
 
-The main dataset used for the analysis is publicly available at [URL]. We download the data for the time period from January 2010 to June 2018, both for Yellow and Green taxis which consists of ~200GB of comma separated value files containing over a 1 Billion records. The schema of the dataset varies by year and taxi company for a total of 6 different schemas. The main columns available through the datasets refer to pickup and dropoff datetimes, trip distance, number of passengers, fare amount, total amount, tip amount, extras and taxes, tolls, ratecode and payment type. The most notable difference between the data is the information about pickup and dropoff locations which is expressed with latitutes and longitudes until 2016 and with numerical taxi zone identifiers for the following years.
+The main dataset used for the analysis is publicly available at \url{http://www.nyc.gov/html/tlc/html/about/trip_record_data.shtml}. We download the data for the time period from January 2010 to June 2018, both for Yellow and Green taxis which consists of ~200GB of comma separated value files containing over a 1 Billion records. The schema of the dataset varies by year and taxi company for a total of 6 different schemas. The main columns available through the datasets refer to pickup and dropoff datetimes, trip distance, number of passengers, fare amount, total amount, tip amount, extras and taxes, tolls, ratecode and payment type. The most notable difference between the data is the information about pickup and dropoff locations which is expressed with latitutes and longitudes until 2016 and with numerical taxi zone identifiers for the following years.
 
-After acquisition of the data we proceed to compress it to .tar.gz format in order to handle them more effectively. The compression is significant, with a resulting dataset size of 43GB. The gzip format however is not particularly suited for big data analysis. The parquet file format provides significant performance advantages such as columnar storage, which allows computations that only need specific columns to access them selectively, specific compression algorithms for each column with dictionary specific encodings and the possibility to decode the file even partially which is convenient in distributed environments such as Spark. The size of the dataset is slightly reduced to 39GB.
+After acquisition of the data we proceed to compress it to .tar.gz format in order to handle them more effectively. The compression is significant, with a resulting dataset size of 43GB. The gzip format however is not particularly suited for big data analysis. The parquet file format provides significant performance advantages such as columnar storage, which allows computations that only need specific columns to access them selectively, specific compression algorithms for each column with dictionary specific encodings and the possibility to decode the file even partially, which is convenient in distributed environments such as Spark. The size of the dataset is slightly reduced to 39GB.
 
 \section{Data transformation}
 
-The parquet dataset is then transformed into a common schema format to uniform the data and ease the analysis. We decide to adopt the following schema
+The parquet dataset is then transformed into a common schema format to uniform the data and ease the analysis. We decide to adopt the following schema:
 
 \begin{itemize}
-	\item taxi\_company, "Green" or "Yellow" according to the taxi type that served the trip
+	\item taxi\_company, ``green'' or ``yellow'' according to the taxi type that served the trip
 	\item pickup\_datetime, date and time of the pickup
 	\item dropoff\_datetime, date and time of the dropoff
 	\item pickup\_location\_id, taxi zone id where the pickup happened, -1 if the zone is unknown
 	\item dropoff\_location\_id, taxi zone id where the dropoff happened, -1 if the zone is unknown
 	\item passenger\_count, number of passengers onboard
 	\item trip\_distance, the metered distance in miles
-	\item ratecode\_id, the fare rate used for the calculation of the amount which includes special rates for JFK or Newark trips.
+	\item ratecode\_id, the fare rate used for the calculation of the amount, which includes special rates for JFK or Newark trips.
 	\item fare\_amount, the fare amount for the trip in \$
-	\item tolls\_amount, the amount due to tolls in \$
+	\item tolls\_amount, the amount of tolls in \$
 	\item total\_amount, the total amount for the trip in \$. It includes tips only for credit card payments.
 	\item mta\_tax, the amount due to MTA tax in \$
 	\item improvement\_surcharge, the amount due to the improvement surcharge in \$
@@ -110,11 +105,11 @@ Note that the common schema codifies the pickup and dropoff locations as the ids
 
 \subsection{Coordinates to Zone conversion algorithm}
 
-Until 2016, information about pickup and dropoff locations is represented through latitudes and longitudes expressed in the World Geodetic System (WGS) coordinate system. The need to have a consistent schema of the data through the years, lead us to develop an efficient algorithm to convert the information about pickup and dropoff locations to numerical taxi zone identifiers. 
+Until 2016, information about pickup and dropoff locations is represented through latitudes and longitudes expressed in the World Geodetic System (WGS) coordinate system. The need to have a consistent schema through the years lead us to develop an efficient algorithm to convert the information about pickup and dropoff locations to numerical taxi zone identifiers. 
 
-According to the shapefile provided with the dataset, the city of New York is divided in 265 zones and the geometric locations, representing each of these zones, are expressed through the NAD83 / New York Long Island (ftUS) coordinate reference system. Our first attempt is to divide New York in a 1000x1000 lookup matrix in which each tile is delimited by some coordinates and is associated with a list of possible zones which are present in these boundaries. This is achieved by including each shape record, representing a specific zone of New York, in the tiles forming the smallest rectangle surrounding that zone. Due to this coarse approximation, each tile may contain many zones.
+According to the shapefile provided with the dataset, the city of New York is divided in 265 zones and the geometric locations, representing each of these zones, are expressed through the NAD83 / New York Long Island (ftUS) coordinate reference system. Our first attempt is to divide New York in a 1000x1000 lookup matrix in which each tile is delimited by some coordinates and is associated with a list of possible zones which are present in these boundaries in order to restrict the search. This is achieved by including each shape record, representing a specific zone of New York, in the tiles forming the smallest rectangle surrounding that zone. Due to this coarse approximation, each tile may contain many zones.
 
-Given the latitude and the longitude of a location in the correct coordinate system, the numerical taxi zone identifier can be obtained by looking at the corresponding tile inside the lookup matrix, scanning each contained shape and retrieving the shape record containing that point. This algorithm is a notable improvement over the naive method, being able to convert some hundreds of records per second for each processor, but still does not allow for the conversion of the whole dataset. The main problem is the need to still linearly search through a list of shapes, although its average length is considerably reduced with respect to the naive implementation. The optimization that allows us to reach the target performance is to refine the coarse list of possible zones for each tile until the point where we directly associate each matrix tile with a unique zone id instead of a list of possible zones. This is possible because by using a 1000x1000 lookup matrix each tile corresponds to a rectangular region of circa 70x70m, which is granular enough to be associated with a single zone even in the case where it lies across zone boundaries. This zone refinement is achieved by defining a set of probing points, such as the ones represented in fig. \ref{fig:probingPoints}, and checking which zones in the coarse list for the current tile actually contain at least one of the probing points. Whenever a tile is associated with more than one zone even with this refinement, we randomly choose only one for performance reasons. Due to the high matrix granularity, this situation occurs in a minority of regions and when it happens it causes tolerable approximation. The performance achieved through this optimization allows for the conversion of roughly 4000 records per core per second, which makes it possible for an 8 thread processor to convert the whole dataset overnight.
+Given the latitude and the longitude of a location in the correct coordinate system, the numerical taxi zone identifier can be obtained by looking at the corresponding tile inside the lookup matrix, scanning each contained shape and retrieving the shape record containing that point. This algorithm is a notable improvement over the naive method, being able to convert some hundreds of records per second for each processor, but still does not allow for the conversion of the whole dataset. The main problem is the need to still linearly search through a list of shapes, although its average length is considerably reduced with respect to the naive implementation. The optimization that allows us to reach the target performance is to refine the coarse list of possible zones for each tile until the point where we directly associate each matrix tile with a unique zone id instead of a list of possible zones. This is possible because by using a 1000x1000 lookup matrix, each tile corresponds to a rectangular region of circa 70x70m, which is granular enough to be associated with a single zone even in the case where it lies across zone boundaries. This zone refinement is achieved by defining a set of probing points, such as the ones represented in fig. \ref{fig:probingPoints}, and checking which zones in the coarse list for the current tile actually contain at least one of the probing points. Whenever a tile is associated with more than one zone even with this refinement, we randomly choose only one for performance reasons. Due to the high matrix granularity, this situation occurs in a minority of regions and when it happens it causes tolerable approximations. The performance achieved through this optimization allows for the conversion of roughly 4000 records per core per second, which makes it possible for an 8 thread processor to convert the whole dataset overnight.
 
 The dataset in common format for years 2010 to 2018 resulting from the conversion has a size of 24GB.
 
@@ -134,16 +129,16 @@ The resulting dataset contains 1.07 Billion entries versus the original 1.38 Bil
 
 \section{Preliminary analysis}
 \label{sec:preliminaryAnalysis}
-The first phase of the analysis is the study of the domain. The New York taxi service is operated by private individuals owning taxi licenses. Two kind of taxi cabs are present, each one with specific characteristics and limitations: yellow cabs, also called medallion taxis, and green cabs, also called boro taxis. The city of New York is divided in five different districts called boroughs, shown in \cref{fig:boroughsMap}: Manhattan, Bronx, Brooklyn, Queens and Staten Island and each one is further divided into taxi zones. Both yellow and green taxis share the same fare system, but, while yellow cabs are allowed to pickup passengers anywhere in the five boroughs, green cabs are not allowed to pick up passengers in South Manhattan, LaGuardia Airport and JFK Airport, the most profitable zones for yellow taxis, but are allowed to drop the passengers anywhere. The reasons for the limitations of green taxis are two. The first is that before the introduction of green taxis, finding a cab in the boroughs outside Manhattan was challenging because yellow taxis prefer to stay in the more profitable Manhattan zone, so this limitation favors the distribution of taxis in the outer zones. The second reason is that the introduction of new licenses for green taxis was seen as a menace from the yellow cab business which strongly opposed to their introduction and obtained that green taxis would not be allowed to pick up passengers at the lucrative LaGuardia and JFK airport zones unless previously arranged by passengers with the driver.
+The first phase of the analysis is the study of the domain. The New York taxi service is operated by private individuals owning taxi licenses. Two kind of taxi cabs are present, each one with specific characteristics and limitations: yellow cabs, also called medallion taxis, and green cabs, also called boro taxis. The city of New York is divided in five different districts called boroughs, shown in \cref{fig:boroughsMap}: Manhattan, Bronx, Brooklyn, Queens and Staten Island and each one is further divided into taxi zones. Both yellow and green taxis share the same fare system, but, while yellow cabs are allowed to pickup passengers anywhere in the five boroughs, green cabs are not allowed to pick up passengers in South Manhattan, LaGuardia Airport and JFK Airport, the most profitable zones for yellow taxis, but are allowed to drop the passengers anywhere. The reasons for the limitations of green taxis are two. The first is that before the introduction of green taxis, finding a cab in the boroughs outside Manhattan was challenging because yellow taxis prefer to stay in the more profitable Manhattan zone, so this limitation favors the distribution of taxis in the outer zones. The second reason is that the introduction of new licenses for green taxis was seen as a menace from the yellow cab business which strongly opposed to their introduction and obtained that green taxis would not be allowed to pick up passengers at the lucrative LaGuardia and JFK airport zones, with the exception of previously arranged trips by passengers with the driver.
 
 \begin{figure}
 	\centering
 	\includegraphics{resources/boroughsMap.jpg}
-	\caption{The five boroughs of New York. Note the position of the three airports: LaGuardia, JFK and Newark.}
+	\caption{The five boroughs of New York. Notice the position of the three airports: LaGuardia, JFK and Newark.}
 	\label{fig:boroughsMap}
 \end{figure}
 
-The fare system is shared by both yellow and green cabs. The amount starts from a base of 2.50\$ and increases as a function of time when moving slowly and as a function of distance when moving faster. Some extras may be added based on the hour of the day as well as various taxes. The passenger is also requested to pay for any incurred toll and is requested to tip the driver with a variable amount that ranges around 20\% of the total. Fares between any zone of Manhattan and LaGuardia airport have a special flat rate of 52\$ plus extras. Newark airport also havs a special rate which adds a 17.50\$ surcharge.
+The fare system is shared by both yellow and green cabs. The amount starts from a base of 2.50\$ and increases as a function of time when moving slowly and as a function of distance when moving faster. Some extras may be added based on the hour of the day as well as various taxes. The passenger is also requested to pay for any incurred toll and is requested to tip the driver with a variable amount that ranges around 20\% of the total. Fares between any zone of Manhattan and LaGuardia airport have a special flat rate of 52\$ plus extras. Newark airport also has a special rate which adds a 17.50\$ surcharge.
 
 \begin{figure}
 	\centering
@@ -152,26 +147,26 @@ The fare system is shared by both yellow and green cabs. The amount starts from 
 	\label{fig:uberVsTaxis}
 \end{figure}
 
-The analysis starts with a high level, exploration of the data. As shown in \cref{fig:travelsByYear} the number of total trips performed in the years grows slightly until 2015 and decreases in the following years. Note immediately that 2010 and 2016 are anomalous years due to data quality problems that caused the removal of entire months of entries for those year. Looking at the profits, calculated based on the total amount we can see an increasing trend in the years until 2015, after which there is a drop in the profits because of the reduced number of trips performed by the taxis. The growth of the profits, despite the only slight increase of the number of trips is given by a higher cost per trip in the years, as shown in \cref{fig:travelsByYear}. The decline of the number of taxi trips started in 2015 can be explained by the growth in popularity of ride hailing services such as Uber, Lyft and Juno which from 2015 are becoming widespread in the city as shown in \cref{fig:uberVsTaxis} and in 2017 surpassed taxis in popularity.
+The analysis starts with a high level, exploration of the data. As shown in \cref{fig:travelsByYear} the number of total trips performed in the years grows slightly until 2015 and decreases in the following years. Note immediately that 2010 and 2016 are anomalous years due to data quality problems that caused the removal of entire months of entries for those year. Looking at the profits, calculated based on the total amount, we can see an increasing trend in the years until 2015, after which there is a drop in the profits because of the reduced number of trips performed by the taxis. The growth of the profits, despite the only slight increase of the number of trips is given by a higher cost per trip in the years, as shown in \cref{fig:travelsByYear}. The decline of the number of taxi trips started in 2015 can be explained by the growth in popularity of ride hailing services such as Uber, Lyft and Juno which, from 2015, are becoming widespread in the city as shown in \cref{fig:uberVsTaxis} and in 2017 surpassed taxis in popularity.
 
 \begin{figure}
 	\centering
 	\includegraphics[width=1\columnwidth]{resources/base_plots/travels_by_year.pdf}
-	\caption{Total trips performed each year. Data for years 2010 and 2016 is missing due to data quality problems, while data for 2018 is only relative for the period January-June. Note the decrease started in 2015.}
+	\caption{Total trips performed each year. Data for years 2010 and 2016 is missing due to data quality problems, while data for 2018 is only relative for the period January-June. Notice the decrease started in 2015.}
 	\label{fig:travelsByYear}
 \end{figure}
 
 \begin{figure}
 	\centering
 	\includegraphics[width=1\columnwidth]{resources/base_plots/pickup_hour_dist.pdf}
-	\caption{Number of pickups as a function of the pickup hour. Note the major activity periods at 8-16 and 20-24.}
+	\caption{Number of pickups as a function of the pickup hour. Notice the major activity periods at 8-16 and 20-24.}
 	\label{fig:pickupHourDist}
 \end{figure}
 
 \begin{figure}
 	\centering
 	\includegraphics[width=1\columnwidth]{resources/base_plots/avg_speed_by_pickup_hour_dist.pdf}
-	\caption{Average speed as a function of pickup hour. Note how the average speed increases in the periods of minor activity.}
+	\caption{Average speed as a function of pickup hour. Notice how the average speed increases in the periods of minor activity.}
 	\label{fig:speedByHour}
 \end{figure}
 
@@ -185,14 +180,14 @@ The analysis starts with a high level, exploration of the data. As shown in \cre
 \begin{figure}
 	\centering
 	\includegraphics[width=1\columnwidth]{resources/base_plots/avg_speed_by_pickup_location_map.pdf}
-	\caption{Map showing the average speed per pickup zone. Note how outer boroughs are typically feature higher average speeds, an indicator of the quantity of traffic.}
+	\caption{Map showing the average speed per pickup zone. Notice how outer boroughs typically feature higher average speeds, an indicator of the quantity of traffic.}
 	\label{fig:speedMap}
 \end{figure}
 
 \begin{figure}
 	\centering
 	\includegraphics[width=1\columnwidth]{resources/base_plots/pickup_vs_dropoff.png}
-	\caption{Map showing pickups points in green and dropoff points in red. Notice how dropoff points are granularly distributed across every street, while pickup points concentrate in Manhattan and on the main streets, meaning that people need to move to major roads in order to find taxis. Looking closely it can also be noted that the most blurry areas, South of Central Park and Southest part of Manhattan, which correspond to high GPS error area, are the ones which indeed have the highest concentration of tall buildings.}
+	\caption{Map showing pickups points in green and dropoff points in red. Notice how dropoff points are granularly distributed across every street, while pickup points concentrate in Manhattan and on the main streets, meaning that people need to move to major roads in order to find taxis. Looking closely, it can also be noted that the most blurry areas, South of Central Park and Southest part of Manhattan, which correspond to high GPS error area, are the ones which indeed have the highest concentration of tall buildings.}
 	\label{fig:pickupDropoffImageMap}
 \end{figure}
 
@@ -203,28 +198,28 @@ The analysis starts with a high level, exploration of the data. As shown in \cre
 	\label{fig:overallPickups}
 \end{figure}
 
-The study continues with the analysis of pickups and dropoffs. \cref{fig:overallPickups} shows the number of pickups as a function of time. As already suggested by \cref{fig:travelsByYear} we notice a significant decrease in taxi service popularity starting from 2015. As depicted in \cref{fig:pickupHourDist} we can see that the periods of major activity for pickups are 8-16 and 20-24. The dropoffs follow the same pattern. Interestingly, by looking at the variation of the average speed through the day as shown in \cref{fig:speedByHour} we note that there is an inverse relationship between number of pickups and average speed, suggesting that in the highlighted time frames the city is subject to higher traffic congestions.
-The most active pickup zones, as we can see from \cref{fig:pickupDistributionMap} are Manhattan, the part of Brooklyn closer to Manhattan, LaGuardia and JFK airports. The dropoff zones closely follow the pattern of the pickup zones, but are slightly more evenly distributed across all zones. \cref{fig:pickupDropoffImageMap} highlights the situation, showing that dropoff locations are more granularly distributed with respect to pickup locations. It must be noted however that the majority of the activity is concentrates in the most profitable Manhattan and airport sectors. \cref{fig:pickupDropoffImageMap} shows an  visualization of pickup and dropoff locations that highlights better the concentration of pickup activity in the zones noted above.
-We also note that, as shown in \cref{fig:speedMap} the average speed per pickup location is inversely proportional to the number of pickups in that location, with the slowest zones being Manhattan, South Bronx and North Brooklyn. We can assume this zones to be the most subject to traffic.
+The study continues with the analysis of pickups and dropoffs. \cref{fig:overallPickups} shows the number of pickups as a function of time. As already suggested by \cref{fig:travelsByYear} we notice a significant decrease in taxi service popularity starting from 2015. As depicted in \cref{fig:pickupHourDist} we can see that the periods of major activity for pickups are 8-16 and 20-24. The dropoffs follow the same pattern. Interestingly, by looking at the variation of the average speed through the day, as shown in \cref{fig:speedByHour}, we note that there is an inverse relationship between number of pickups and average speed, suggesting that in the highlighted time frames the city is subject to higher traffic congestions.
+The most active pickup zones, as we can see from \cref{fig:pickupDistributionMap}, are Manhattan, the part of Brooklyn closer to Manhattan, LaGuardia and JFK airports. The dropoff zones closely follow the pattern of the pickup zones, but are slightly more evenly distributed across all zones. \cref{fig:pickupDropoffImageMap} highlights the situation, showing that dropoff locations are more granularly distributed with respect to pickup locations. It must be noted however that the majority of the activity is concentrates in the most profitable Manhattan and airport sectors.
+We also note that, as illustrated in \cref{fig:speedMap}, the average speed per pickup location is inversely proportional to the number of pickups in that location, with the slowest zones being Manhattan, South Bronx and North Brooklyn. We can assume this zones to be the most subject to traffic.
 
 \begin{figure}
 	\centering
 	\includegraphics[width=1\columnwidth]{resources/base_plots/avg_total_amount_by_pickup_location_map.pdf}
-	\caption{Map showing the number the average total amount by pickup location. Note the inverse relationship with the distance from Manhattan.}
+	\caption{Map showing the average total amount by pickup location. Notice the inverse relationship with the distance from Manhattan.}
 	\label{fig:totalAmountMap}
 \end{figure}
 
 \begin{figure}
 	\centering
 	\includegraphics[width=1\columnwidth]{resources/base_plots/avg_distance_by_pickup_location_map.pdf}
-	\caption{Map showing the number the average trip distance by pickup location. Note the inverse relationship with the distance from Manhattan and the correlation with the average total amount map.}
+	\caption{Map showing the number the average trip distance by pickup location. Notice the inverse relationship with the distance from Manhattan and the correlation with the average total amount map.}
 	\label{fig:distanceMap}
 \end{figure}
 
 \begin{figure}
 	\centering
 	\includegraphics[width=1\columnwidth]{resources/base_plots/avg_total_amount_by_pickup_hour.pdf}
-	\caption{Average total amount divided by pickup hour. Note the two peaks at 5 and 16.}
+	\caption{Average total amount divided by pickup hour. Notice the two peaks at 5 and 16.}
 	\label{fig:totalAmountByHour}
 \end{figure}
 
@@ -235,7 +230,7 @@ We also note that, as shown in \cref{fig:speedMap} the average speed per pickup 
 	\label{fig:totalAmountByMonth}
 \end{figure}
 
-It is also interesting to notice how total amounts relate to the pickup location. As depicted in \cref{fig:totalAmountMap} it can be noted that there is an inverse relationship between average total amount and zone distance from Manhattan. This is an expected outcome of the fact that Manhattan is one of the favourite dropoff locations, so on average the furthest zones from it are the most expensive. \cref{fig:distanceMap} shows average trip distance by pickup location. Here we can note the direct correlation with the average total amount of the preceding picture. The average total amount also varies during the day, as depicted in \cref{fig:totalAmountByHour}. Two different peak periods are identified around 5 and 16. The discontinuity at 16 is caused by the introduction of a 1\$ extra from 16 to 20 as a standard component of the fare amount, while the peak at 5 is caused by a sharp increase of the average trip distance from 2.92 to 4.61 miles due to an increased proportion of people going to the airport early in the morning with respect to the normal traffic. It can also be noted from \cref{fig:totalAmountByMonth} that the average total amount varies during the months, with most profitable periods being May and September-October.
+It is also interesting to notice how total amounts relate to the pickup location. As depicted in \cref{fig:totalAmountMap} it can be noted that there is an inverse relationship between average total amount and zone distance from Manhattan. This is an expected outcome of the fact that Manhattan is one of the favourite dropoff locations, so on average the furthest zones from it are the most expensive. \cref{fig:distanceMap} shows the average trip distance by pickup location. Here we can note the direct correlation with the average total amount of the preceding picture. The average total amount also varies during the day, as depicted in \cref{fig:totalAmountByHour}. Two different peak periods are identified around 5 and 16. The discontinuity at 16 is caused by the introduction of a 1\$ extra from 16 to 20 as a standard component of the fare amount, while the peak at 5 is caused by a sharp increase in the average trip distance from 2.92 to 4.61 miles due to an increased proportion of people going to the airport early in the morning with respect to the normal traffic. It can also be noted from \cref{fig:totalAmountByMonth} that the average total amount varies during the months, with most profitable periods being May and September-October.
 
 \begin{figure}
 	\centering
@@ -247,42 +242,42 @@ It is also interesting to notice how total amounts relate to the pickup location
 \begin{figure}
 	\centering
 	\includegraphics[width=1\columnwidth]{resources/base_plots/payment_type_distr.pdf}
-	\caption{Distribution of payment types during the years. Note the steady decline of cash payments in favor of credit card payments.}
+	\caption{Distribution of payment types during the years. Notice the steady decline of cash payments in favor of credit card payments.}
 	\label{fig:paymentTypeByYear}
 \end{figure}
 
 \begin{figure}
 	\centering
 	\includegraphics[width=1\columnwidth]{resources/base_plots/fare_amount_distr.pdf}
-	\caption{Distribution of fare amounts. Note the peaks at 45\$ and 52\$ corresponding to the JFK airport flat rates before and after the 2012 fares revision operated by the New York taxi commission.}
+	\caption{Distribution of fare amounts. Notice the peaks at 45\$ and 52\$ corresponding to the JFK airport flat rates before and after the 2012 fares revision operated by the New York taxi commission.}
 	\label{fig:fareAmountDistr}
 \end{figure}
 
 \begin{figure}
 	\centering
 	\includegraphics[width=1\columnwidth]{resources/base_plots/overall_fare_amount.pdf}
-	\caption{Average fare amount by day in \$. Note how in 2012 the new fare system caused a prominent increase in fare rates.}
+	\caption{Average fare amount by day in \$. Notice how in 2012 the new fare system caused a prominent increase in fare rates.}
 	\label{fig:overallFareAmount}
 \end{figure}
 
-We also noted a general increase of the total amount during the years as noted in \cref{fig:totalAmountByYear} which is a consequence of many factors. First, the average fare amount passed from 10.18\$ of 2010 to 12.61\$ of 2018 due to a general revision of fare rates operated by the New York taxi commission in 2012 which can be seen in \cref{fig:overallFareAmount}. Other factors include slight increases in the average tolls, extras and improvement surcharge during the years. It must be noted however that the increase is exacerbated by the fact that total amounts in our datasets include tips only for trips paid with credit card and that during the years there has been a constant increase in the use of credit cards as shown in \cref{fig:paymentTypeByYear}. If our dataset included also cash tips, then we would still notice an increase in the total amount during the years, although more subtle.
-The overall distribution of fare amounts is shown in \cref{fig:fareAmountDistr}. Note the sharp discontinuities at 52\$ and 45\$. These represents the special fare rate of trips linking Manhattan to the JFK airport before and after a general revision of fare rates operated by the New York taxi commission during 2012.
+We also noted a general increase of the total amount during the years, as noted in \cref{fig:totalAmountByYear}, which is a consequence of many factors. First, the average fare amount passed from 10.18\$ of 2010 to 12.61\$ of 2018 due to a general revision of fare rates operated by the New York taxi commission in 2012 which can be seen in \cref{fig:overallFareAmount}. Other factors include slight increases in the average tolls, extras and improvement surcharge during the years. It must be noted however that the increase is exacerbated by the fact that total amounts in our datasets include tips only for trips paid with credit card and that during the years there has been a constant increase in the use of credit cards as shown in \cref{fig:paymentTypeByYear}. If our dataset included also cash tips, then we would still notice an increase in the total amount during the years, although more subtle.
+The overall distribution of fare amounts is shown in \cref{fig:fareAmountDistr}. Note the sharp discontinuities at 52\$ and 45\$. These represents the special fare rate of trips linking Manhattan to the JFK airport, before and after a general revision of fare rates operated by the New York taxi commission during 2012.
 
-A consistent part of the total amount is given by tips. A calculation of average tips percentages, calculated only on credit card paid trips, shows that the typical trip is tipped 18.6\% and this rate remains stable in all the analyzed years. This value corresponds to the guidelines of many online sources that suggest tipping taxi drivers around 15 to 20\% of the total amount.
+A consistent part of the total amount is given by tips. A calculation of average tips percentages, calculated only on credit card paid trips, shows that the typical trip is tipped 18.6\% and this rate remains stable in all the analyzed years. This value corresponds to the guidelines of many online sources that suggest tipping taxi drivers from 15\% to 20\% of the total amount.
 
 \begin{figure}
 	\centering
 	\includegraphics[width=1\columnwidth]{resources/base_plots/trip_distance_distr.pdf}
-	\caption{Distribution of trip distances. Note the three modes at 1, 9 and 17 miles.}
+	\caption{Distribution of trip distances. Notice the three modes at 1, 9 and 17 miles.}
 	\label{fig:tripDistanceDistr}
 \end{figure}
 
-Other interesting findings regard the distribution of trip distances which is shown in \cref{fig:tripDistanceDistr}. It can be observed that the distribution is trimodal, with the first mode at 1 mile which represents short trips performed mainly inside Manhattan, the second at 9 miles, which represents trips between Manhattan and LaGuardia airport, the third at 17 miles, which represents trips between Manhattan and JFK airport.
+Other interesting findings regard the distribution of trip distances which is shown in \cref{fig:tripDistanceDistr}. It can be observed that the distribution is trimodal, with the first mode at 1 mile, which represents short trips performed mainly inside Manhattan, the second at 9 miles, which represents trips between Manhattan and LaGuardia airport, and the third at 17 miles, which represents trips between Manhattan and JFK airport.
 
 \begin{figure}
 	\centering
 	\includegraphics[width=1\columnwidth]{resources/base_plots/passenger_count_dist.pdf}
-	\caption{Distribution of passenger counts.}
+	\caption{Distribution of the number of passengers.}
 	\label{fig:passengerCountDistr}
 \end{figure}
 
@@ -293,19 +288,19 @@ By looking at the distribution of payment types during the years in \cref{fig:pa
 \begin{figure}
 	\centering
 	\includegraphics[width=1\columnwidth]{resources/base_plots/tolls_amount_distr.pdf}
-	\caption{Distribution of tolls amount. Note the modes at 0\$ and 5\$.}
+	\caption{Distribution of tolls amount. Notice the modes at 0\$ and 5\$.}
 	\label{fig:tollsAmountDistr}
 \end{figure}
 
-As a last general remark we note that the distribution of tolls amount as shown in \cref{fig:tollsAmountDistr} is bimodal, with the first mode at 0\$ and a smaller mode at 5\$, representing the fact that the majority of trips are not subject to tolls, while the one that are pay on average 5\$ of tolls. These corresponds to tolls for Queens-Midtown Tunnel, Brooklyn-Battery Tunnel and the Triboro Bridge, which are convenient ways to avoid traffic for reaching the various parts of Manhattan from Brooklyn and Queens.
+As a last general remark, we note that the distribution of tolls amount, as shown in \cref{fig:tollsAmountDistr}, is bimodal, with the first mode at 0\$ and a smaller mode at 5\$, representing the fact that the majority of trips are not subject to tolls, while the ones that are subject to them pay on average 5\$ of tolls. These correspond to tolls for Queens-Midtown Tunnel, Brooklyn-Battery Tunnel and the Triboro Bridge, which are convenient ways to avoid traffic for reaching the various parts of Manhattan from Brooklyn and Queens.
 
 \section{Traffic segmentation}
 
-After the data cleaning and preliminary analysis phase, we decide to perform a characterization of the different types of trips through k-means clustering. In order to perform an effective clustering we introduce new features to the dataset and manipulate existing ones in order to guide the model towards finding interesting trends in the data. The following features are given to the clustering algorithm:
+After the data cleaning and preliminary analysis phase, we decide to perform a characterization of the different types of trips through k-means clustering. In order to perform an effective clustering, we introduce new features to the dataset and manipulate existing ones in order to guide the model towards finding interesting trends in the data. The following features are given to the clustering algorithm:
 
 \begin{itemize}
 	\item taxi company, boolean field representing whether the trip was served by yellow or green taxis
-	\item pickup hour and dropoff hour, scaled integer field representing the hour of pickup and dropoff
+	\item pickup hour and dropoff hour, scaled integer fields representing the hour of pickup and dropoff
 	\item weekend, boolean field set to true if the trip happened during the weekend
 	\item passenger count, scaled numerical field representing the number of passengers
 	\item speed, scaled numerical field representing average speed
@@ -314,26 +309,16 @@ After the data cleaning and preliminary analysis phase, we decide to perform a c
 	\item fare amount, scaled numerical field representing metered fare
 	\item tolls amount, scaled numerical field representing the incurred tolls
 	\item payment type, one hot encoded field representing the payment method
-	
 \end{itemize}  
 
-Note that, as our objective is to find a global characterization of trip types which possible span the entire city, we do not include pickup and dropoff zone ids as clustering features, because this would cause the algorithm to divide trips based on their starting or ending point which does not carry useful information.
+Note that, as our objective is to find a global characterization of trip types which possible span the entire city, we do not include pickup and dropoff zone ids as clustering features because this would cause the algorithm to divide trips based on their starting or ending point which does not carry useful information. Notice also that we scaled every numerical field by its mean and variance. Without doing so, features with a wide range such as the fare amount would be the only ones relevant for the algorithm, which is not the result we want to obtain.
 
 \begin{figure}
 	\centering
 	\includegraphics[width=1\columnwidth]{resources/clustered_plots/elbow.pdf}
-	\caption{Representation of clustering error as a function of the number of clusters k. For k=5 we note that the error curve starts flattening, so 5 is chosen as the optimal k value.}
+	\caption{Representation of clustering error as a function of the number of clusters k. For performance reasons the error is estimated on a subportion of the dataset, so some points have an anomalous behavior. For k=5 we note that the error curve starts flattening, so 5 is chosen as the optimal k value.}
 	\label{fig:elbow}
 \end{figure}
-
-%Iniziare facendo vedere gli orari, il ratecode e il numero di passeggeri per dire come e' stato segmentato
-
-%il traffico di giorno e' stato l'ultimo ad abbandonare Contanti, aeroporto e' stato il primo
-%Airport does the most long distance traffic. Morning and Evening are heavytail distance
-%This reflects in higher fare amounts for those
-%Mostrare che i tolls sono tutti per l'aeroporto
-%Mostrare il pickup day che nel weekend i notturni aumentano
-%Nulla di interessante sulle mappe
 
 \begin{figure}
 	\centering
@@ -356,30 +341,30 @@ Note that, as our objective is to find a global characterization of trip types w
 \begin{figure}
 	\centering
 	\includegraphics[width=1\columnwidth]{resources/clustered_plots/passenger_count_distr.pdf}
-	\caption{Distribution of fare amounts per cluster.}
+	\caption{Distribution of number of passengers per cluster.}
 	\label{fig:clusterPassengerDistr}
 \end{figure}
 
 \begin{figure}
 	\centering
 	\includegraphics[width=1\columnwidth]{resources/clustered_plots/payment_type_distr.pdf}
-	\caption{Distribution of fare amounts per cluster.}
+	\caption{Distribution of payment types in time per cluster.}
 	\label{fig:clusterPaymentType}
 \end{figure}
 
 \begin{figure}
 	\centering
 	\includegraphics[width=1\columnwidth]{resources/clustered_plots/pickup_weekday_dist.pdf}
-	\caption{Distribution of fare amounts per cluster.}
+	\caption{Distribution across the week of the number of pickups per cluster.}
 	\label{fig:clusterPickupDay}
 \end{figure}
 
 
 The appropriate number of clusters for the k-means clustering algorithm is detected using the Elbow method, which results are shown in \cref{fig:elbow}. For our dataset, the procedure suggested a number of cluster equal to 5. 
 
-We then proceed to identify the characteristics of each of these 5 identified clusters. By looking at \cref{fig:clusterPickupHour}, we notice that cluster 1 corresponds to early morning trips done from 0 until 7, cluster 4 corresponds to day trip from 8 to 15 and cluster 2 corresponds to trip from 16 to 24. Furthermore, from \cref{fig:clusterRatecode} it can be seen that cluster 3 comprehends trips to JFK and Newark airports. By looking at \cref{fig:clusterDistance} and by plotting the pickup locations on a map as a function of the cluster we can also say that cluster 3 comprehends trips to LaGuardia airport. Lastly, by looking at \cref{fig:clusterPassengerDistr} we can see that cluster 0 corresponds to trips performed by groups of 4 or more people. We note also that cluster 1 and 2 that represent respectively early morning and night trips could be unified in a single cluster with common characteristics. The only reason why our clustering algorithm separated them is that the pickup and dropoff hour property cause trips in the evening to have a high distance measure from trips in the morning, while a more reasonable distance metric would assign to trips in the evening and trip in the morning a smaller distance.
+We then proceed to identify the characteristics of each of these 5 identified clusters. By looking at \cref{fig:clusterPickupHour}, we notice that cluster 1 corresponds to early morning trips done from 0 until 7, cluster 4 corresponds to day trip from 8 to 15 and cluster 2 corresponds to trip from 16 to 24. Furthermore, from \cref{fig:clusterRatecode} it can be seen that cluster 3 comprehends trips to JFK and Newark airports. Moreover, by looking at \cref{fig:clusterDistance} and by plotting the pickup locations on a map as a function of the cluster, we can also say that cluster 3 comprehends trips to LaGuardia airport. Lastly, by looking at \cref{fig:clusterPassengerDistr} we can see that cluster 0 corresponds to trips performed by groups of 4 or more people. We note also that cluster 1 and 2, that represent respectively early morning and night trips, could be unified in a single cluster with common characteristics. The reason why our clustering algorithm separated them is that the pickup and dropoff hour property cause trips in the evening to have a high distance measure from trips in the morning, while a more reasonable distance metric would use a circular similarity measure and assign to trips in the evening and trip in the morning a smaller distance.
 
-By looking further into the data we can notice from \cref{fig:clusterDistance} that day trips in cluster 2 tend to have a light tail, compared to heavy tails of clusters for morning and night trips and for group rides. This difference is probably explained by the fact that people tend to use taxis also for long and expensive trips at nights where the availability of other means of transport is reduced. From \cref{fig:clusterPaymentType} it can be noted that group rides and day trips tend to have a lower CC to Cash payment ratios, while airport trips, morning trips and night trips tent to be paid with credit card more frequently. It is also interesting to notice how these type of traffics vary through the week as shown in \cref{fig:clusterPickupDay}. Day trips tend to have their peak on Thursday and have lower activity along the weekend. On the other hand group rides, morning trips and evening trips tend to peak in the weekend, probably because of the increased nightlife. Airport trips on the other hand have their peak on Monday and register their lowest point on Sunday.
+By looking further into the data, we can notice from \cref{fig:clusterDistance} that day trips in cluster 2 tend to have a light tail, compared to heavy tails of clusters for morning and night trips and for group rides. This difference is probably explained by the fact that people tend to use taxis also for long and expensive trips at nights where the availability of other means of transport is reduced. From \cref{fig:clusterPaymentType} it can be noted that group rides and day trips tend to have a lower CC to Cash payment ratios, while airport trips, morning trips and night trips tent to be paid with credit card more frequently. It is also interesting to notice how these type of traffics vary through the week as shown in \cref{fig:clusterPickupDay}. Day trips tend to have their peak on Thursday and have lower activity along the weekend. On the other hand, group rides, morning trips and evening trips tend to peak in the weekend, probably because of the increased nightlife. Airport trips, on the other hand, have their peak on Monday and register their lowest point on Sunday.
 
 
 \cref{fig:TrafficGraphWithLegend} shows the network graph constructed for better visualize the different types of traffic inside the city of New York. Each node represents one of the 265 zones of New York, while each edge represents a traffic flow from a starting zone to a destination zone. The colour of the nodes depend on the borough to which they belong, while the colour of the edges depend on the cluster to which they belong. An important aspect to note is that the number of edges starting from a node is variable and depends on the number of pickups per that zone. In addition, each node has a set of attributes, whose value can be LOW, MEDIUM and HIGH, describing the level of activity, the level of distance, the level of duration, the level of speed and the level of total amount of that zone. For each of these attributes, the values are calculated by finding the first and third quartiles of the corresponding distribution. The value of a given attribute for a node is considered LOW if the value of the node lies below the 25\% of the data in the dataset, MEDIUM if the value of the node lies between the 25\% and the 75\%, and HIGH if the value of the node lies above the 75\% of the data in the dataset. By looking at the graph it can be noted that the clustering found as group 1 the traffic to the JFK airport and as group 2 the traffic to the LaGuardia airport. For a better visualization of the network graph, please refer to the interactive version of the graph and its legend that can be found on traffic\_graph.zip. 
@@ -393,7 +378,7 @@ By looking further into the data we can notice from \cref{fig:clusterDistance} t
 
 \section{Traffic flow analysis}
 
-One of the objectives of this report is to better understand how people move inside the city of New York. We partially describe this activity in \cref{sec:preliminaryAnalysis} by showing the high activity levels of Manhattan and of the Airport zones. In order to better understand the flows of traffic we decide to plot for each pickup borough, the distribution of dropoff locations as a function of time.
+One of the objectives of this report is to better understand how people move inside the city of New York. We partially describe this activity in \cref{sec:preliminaryAnalysis} by showing the high activity levels of Manhattan and of the airport zones. In order to better understand the flows of traffic, we decide to plot, for each pickup borough, the distribution of dropoff locations as a function of time.
 
 \begin{figure}
 	\centering
@@ -413,7 +398,7 @@ One of the objectives of this report is to better understand how people move ins
 \end{figure}
 
 
-\cref{fig:brooklynDropoffMap} shows the distribution of dropoff locations for pickups happened in the Brooklyn borough. Also in this case the majority of dropoffs happen inside the borough itself, the two airports or the adjacent Manhattan zones. An interesting consideration can be done by looking at \cref{fig:brooklyn9DropoffMap} which shows the favourite dropoff locations for rides beginning at 9. From 7 to 9 we can see a high rates of dropoffs in the Tribeca district of Manhattan, which is the ending point of the Brooklyn Bridge. This flow vanishes during the day and is probably caused by workers moving into the city early in the morning. 
+\cref{fig:brooklynDropoffMap} highlights the distribution of dropoff locations for pickups happened in the Brooklyn borough. Also in this case, the majority of dropoffs happen inside the borough itself, the two airports or the adjacent Manhattan zones. An interesting consideration can be done by looking at \cref{fig:brooklyn9DropoffMap} which shows the favourite dropoff locations for rides beginning at 9. From 7 to 9 we can see a high rate of dropoffs in the Tribeca district of Manhattan, which is the ending point of the Brooklyn Bridge. This flow vanishes during the day and is probably caused by workers moving into the city early in the morning. 
 
 \begin{figure}
 	\centering
@@ -424,7 +409,7 @@ One of the objectives of this report is to better understand how people move ins
 	
 \end{figure}
 
-\cref{fig:bronxDropoffMap} shows the distribution of dropoff locations for pickups happened in the Manhattan borough. Most dropoffs happen within Manhattan itself or in the airports. During the day the most active dropoff zones are those on the South East corner of Central Park, while after 20, most of the dropoffs concentrate in the South West Manhattan area and in East Village. From this fact and from some research on the New York nightlife we infer that this shift is caused by people moving to these zones to experiment the New York nightlife. The fact is cross checked by looking at the locations where most pickups happen at night, which are again South West Manhattan and East Village.
+\cref{fig:bronxDropoffMap} depicts the distribution of dropoff locations for pickups happened in the Manhattan borough. Most dropoffs happen within Manhattan itself or in the airports. During the day the most active dropoff zones are those on the South East corner of Central Park, while after 20, most of the dropoffs concentrate in the South West Manhattan area and in East Village. From this fact and from some research on the New York nightlife we infer that this shift is caused by people moving to these zones to experiment the New York nightlife. The fact is cross checked by looking at the locations where most pickups happen at night, which are again South West Manhattan and East Village.
 
 \begin{figure}
 	\centering
@@ -442,11 +427,11 @@ One of the objectives of this report is to better understand how people move ins
 	\label{fig:statenIslandDropoffMap}
 \end{figure}
 
-\cref{fig:statenIslandDropoffMap} shows the distribution of dropoff locations for pickups happened in the Staten Island borough. This district features an anomalous behavior in that the majority of dropoffs happen in the districs West of Central Park and the airports instead of inside Staten Island itself. This behavior remains constant throughout the whole day.
+\cref{fig:statenIslandDropoffMap} shows the distribution of dropoff locations for pickups happened in the Staten Island borough. This district features an anomalous behavior in that the majority of dropoffs happen in the zones West of Central Park and the airports instead of inside Staten Island itself. This behavior remains constant throughout the whole day.
 
 \section{Yellow vs Green cabs}
 
-A major change in the taxi business was given by the addition of green taxis in addition to the traditional yellow cabs. In this section we analyze the impact of this introduction and the difference from the yellow taxis.
+A major change in the taxi business was given by the addition of green taxis along with the traditional yellow cabs. In this section we analyze the impact of this introduction and the difference from the yellow taxis.
 
 \begin{figure}
 	\centering
@@ -464,7 +449,7 @@ A major change in the taxi business was given by the addition of green taxis in 
 	\label{fig:fareAmountByCompany}
 \end{figure}
 
-Looking at \cref{fig:fareAmountByCompany}, which compares the distribution of fare amounts we immediately notice that the curves have similar shape, although the longest and profitable airport trips, the ones with 52\$ fare rate, are almost always performed by yellow cabs. This is expected, since green cabs can only perform dropoffs at the airport and pick up passengers only if the trip is arranged in advance, which is a severe limitation.
+Looking at \cref{fig:fareAmountByCompany}, which compares the distribution of fare amounts, we immediately notice that the curves have similar shape, although the longest and profitable airport trips, the ones with 52\$ fare rate, are almost always performed by yellow cabs. This is expected, since green cabs can only perform dropoffs at the airport and pick up passengers only if the trip is arranged in advance, which is a severe limitation.
 
 \begin{figure}
 	\centering
@@ -475,7 +460,6 @@ Looking at \cref{fig:fareAmountByCompany}, which compares the distribution of fa
 
 By analyzing \cref{fig:tripDistanceByCompany} we also note that, while the distribution of yellow taxis is trimodal, the distribution for green taxis is not. In particular we notice that green taxis miss the 9 miles and 17 miles mode, which are the trips to the JFK and LaGuardia airports. Trips at LaGuardia airport do not happen often for the same limitations of green taxis explained in the former paragraph.
 
-
 \begin{figure}
 	\centering
 	\includegraphics[width=1\columnwidth]{resources/base_plots/pickup_location_by_company_after_2014_distr_difference_map.pdf}
@@ -485,15 +469,15 @@ By analyzing \cref{fig:tripDistanceByCompany} we also note that, while the distr
 \begin{figure}
 	\centering
 	\includegraphics[width=1\columnwidth]{resources/base_plots/yellow_vs_green_pickup.png}
-	\caption{ view showing pickup points of yellow and green taxis in their respective color. Note how Manhattan and the airports feature yellow prevalence, while the other zones feature a green prevalence.}
+	\caption{Pickup points of yellow and green taxis in their respective color. Notice how Manhattan and the airports feature yellow prevalence, while the other zones feature a green prevalence.}
 	\label{fig:companyDivisionImageMap}
 \end{figure}
 
-Green taxis were introduced explicitly to help serving the outer boroughs, where it is difficult to find a yellow cab, because they prefer to remain in the profitable Manhattan zone. \cref{fig:companyDivisionMap} shows which taxi type is more popular in the various zones since year 2014. Indeed we can see that green taxis became prevalent in North Manhattan, where they are allowed to pick up passengers, and in every outer borough with the exception of Staten Island and the two airport zones where they are not allowed to perform non arranged pickups. \cref{fig:companyDivisionImageMap} shows an  view of the yellow-green taxi presence in New York.
+Green taxis were introduced explicitly to help serving the outer boroughs, where it is difficult to find a yellow cab, because they prefer to remain in the profitable Manhattan zone. \cref{fig:companyDivisionMap} shows which taxi type is more popular in the various zones since year 2014. Indeed we can see that green taxis became prevalent in North Manhattan, where they are allowed to pick up passengers, and in every outer borough with the exception of Staten Island and the two airport zones where they are not allowed to perform non arranged pickups. \cref{fig:companyDivisionImageMap} shows an alternative view of the yellow-green taxi presence in New York.
 
 \section{Airport traffic}
 
-Given the relevance of the airport traffic emerged by the previous analysis step we decide to perform a more thorough analysis of the traffic originated or directed to the three airports. The first remark is that, due to Newark airport not being in a valid taxi zone, the data cleaning phase removed many of the trips to the Newark airpot and so data regarding it is not reliable.
+Given the relevance of the airport traffic emerged by the previous analysis step, we decide to perform a more thorough analysis of the traffic originated or directed to the three airports. The first remark is that, due to Newark airport not being in a valid taxi zone, the data cleaning phase removed many of the trips to the Newark airport and so data regarding it is not reliable.
 
 \begin{figure}
 	\centering
@@ -512,16 +496,16 @@ Given the relevance of the airport traffic emerged by the previous analysis step
 \begin{figure}
 	\centering
 	\includegraphics[width=1\columnwidth]{resources/airport/fare_amount_distr.pdf}
-	\caption{Distribution of fare amount. Note the mode at ~30\$ corresponding to trips to LaGuardia airport and the 45\$ and 52\$ flat rate amounts corresponding to trips to JFK from Manhattan. The right heavy tail is given by trips to the JFK from outside Manhattan that are not subject to the flat rate.}
+	\caption{Distribution of fare amount. Notice the mode at ~30\$ corresponding to trips to LaGuardia airport and the 45\$ and 52\$ flat rate amounts corresponding to trips to JFK from Manhattan. The right heavy tail is given by trips to the JFK from outside Manhattan that are not subject to the flat rate.}
 	\label{fig:airportFareAmount}
 \end{figure}
 
-We first notice from \cref{fig:airportDistr} that airport trips make a relatively small 5.92\% of the total number of taxi trips. Despite that, as \cref{fig:airportProfitDistr} shows, they are a major stream of revenues for taxi due to the very high per cost per trip making 18.7\% of their profits. In fact, by looking at the fare rate distribution in \cref{fig:airportFareAmount}, and comparing it with \cref{fig:fareAmountDistr} we can see that fare amounts for LaGuardia averages around 30\$, fare amounts towards JFK have a fixed fare rate of 52\$ (45\$ before fare rate revision operated in 2012), while the in majority of common taxi trips the fare amounts are below 10\$. It it thus not surprising that yellow taxi owners fought for forbidding green taxis to pick up passengers at airports.
+We first notice from \cref{fig:airportDistr} that airport trips make a relatively small 5.92\% of the total number of taxi trips. Despite that, as \cref{fig:airportProfitDistr} shows, they are a major stream of revenue for taxis due to the very high cost per trip, making 18.7\% of their profits. In fact, by looking at the fare rate distribution in \cref{fig:airportFareAmount}, and comparing it with \cref{fig:fareAmountDistr} we can see that fare amounts for LaGuardia averages around 30\$, fare amounts towards JFK have a fixed fare rate of 52\$ (45\$ before fare rate revision operated in 2012), while the in majority of common taxi trips the fare amounts are below 10\$. It it thus not surprising that yellow taxi owners fought for forbidding green taxis to pick up passengers at airports.
 
 \begin{figure}
 	\centering
 	\includegraphics[width=1\columnwidth]{resources/airport/payment_type_distr.pdf}
-	\caption{Distribution of payment methods from 2010 to 2018. Note how already from 2011 credit card payments make for the majority of payments. The higher percentage of credit card payments is probably given by the high cost of airport trips.}
+	\caption{Distribution of payment methods from 2010 to 2018. Notice how already from 2011 credit card payments make for the majority of payments. The higher percentage of credit card payments is probably given by the high cost of airport trips.}
 	\label{fig:airportPaymentType}
 \end{figure}
 
@@ -544,7 +528,7 @@ From \cref{fig:airportPickupHourDistr} we can look at the number of trips as a f
 	\label{fig:airportTollsAmount}
 \end{figure}
 
-As a last remark, by looking at the distribution of tolls amount in \cref{fig:airportTollsAmount} we notice that the number of trips subject to tolls is the majority with respect to the total number of trips. By comparing it with \cref{fig:tollsAmountDistr} we see that airport trips are responsible for the majority of trips that were subject to tolls.
+As a last remark, by looking at the distribution of tolls amount in \cref{fig:airportTollsAmount}, we notice that the number of trips subject to tolls is the majority with respect to the total number of trips. By comparing it with \cref{fig:tollsAmountDistr} we see that airport trips are responsible for the majority of trips that were subject to tolls.
 
 \section{Conclusions}
 

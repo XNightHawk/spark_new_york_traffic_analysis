@@ -1,3 +1,29 @@
+'''
+
+  ________    ______   ______     _          ____        __
+ /_  __/ /   / ____/  /_  __/____(_)___     / __ \____ _/ /_____ _
+  / / / /   / /        / / / ___/ / __ \   / / / / __ `/ __/ __ `/
+ / / / /___/ /___     / / / /  / / /_/ /  / /_/ / /_/ / /_/ /_/ /
+/_/ /_____/\____/    /_/ /_/  /_/ .___/  /_____/\__,_/\__/\__,_/
+                               /_/
+
+
+Authors: Willi Menapace <willi.menapace@studenti.unitn.it>
+         Luca Zanells <luca.zanella-3@studenti.unitn.it>
+
+Produces high resolution images showing pickup and dropoff points contained in the dataset
+
+Required files: Original dataset converted to parquet format
+
+Parameters to set:
+master -> The url for the spark cluster, set to local for your convenience
+read_dataset_folder -> Location from which to read the dataset
+dataset_folder -> Location to which to write the results
+res_lat -> Resolution in pixels of the image to produce
+cmap parameter -> Produces images in a different color gradient
+                  Greys is used for easing post processing
+'''
+
 import pyspark
 from pyspark.sql import SparkSession
 import pyspark.sql.functions
@@ -21,12 +47,9 @@ spark = SparkSession.builder.appName(appName).getOrCreate()
 
 read_dataset_folder = '/home/bigdata/auxiliary/'
 dataset_folder = '/home/bigdata/auxiliary/'
-results_folder = '/home/bigdata/auxiliary/stats/'
 
-
-
-yellow_2010 = spark.read.parquet('file://' + read_dataset_folder + 'yellow_tripdata_2010.parquet').printSchema()
-
+#Reads the dataset and transforms to a common format
+#Only datasets up to 2016 contain coordinates, so later datasets are not loaded
 yellow_2010 = spark.read.parquet('file://' + read_dataset_folder + 'yellow_tripdata_2010.parquet')
 yellow_2010 = yellow_2010.select(yellow_2010["pickup_latitude"].alias("lat"), yellow_2010["pickup_longitude"].alias("lng"), yellow_2010["dropoff_latitude"].alias("dlat"), yellow_2010["dropoff_longitude"].alias("dlng"))
 yellow_2011 = spark.read.parquet('file://' + read_dataset_folder + 'yellow_tripdata_2011.parquet')
@@ -97,18 +120,19 @@ yellow_dropoff_dataset = yellow_dataset.select((((yellow_dataset["dlat"] - (lat_
 green_pickup_dataset = green_dataset.select((((green_dataset["lat"] - (lat_low)) / divide_factor).cast(IntegerType()).alias("lat_index")), (((green_dataset["lng"] - (lng_low)) / divide_factor).cast(IntegerType()).alias("lng_index"))).groupBy("lat_index", "lng_index").count()
 green_dropoff_dataset = green_dataset.select((((green_dataset["dlat"] - (lat_low)) / divide_factor).cast(IntegerType()).alias("lat_index")), (((green_dataset["dlng"] - (lng_low)) / divide_factor).cast(IntegerType()).alias("lng_index"))).groupBy("lat_index", "lng_index").count()
 
+#Produces CSV intermediate results
 print("Elaborating 1")
-#pickup_dataset.toPandas().to_csv(dataset_folder + "pickup_image_data.csv", header=True)
+pickup_dataset.toPandas().to_csv(dataset_folder + "pickup_image_data.csv", header=True)
 print("Elaborating 2")
-#dropoff_dataset.toPandas().to_csv(dataset_folder + "dropoff_image_data.csv", header=True)
+dropoff_dataset.toPandas().to_csv(dataset_folder + "dropoff_image_data.csv", header=True)
 print("Elaborating 3")
-#yellow_pickup_dataset.toPandas().to_csv(dataset_folder + "yellow_pickup_image_data.csv", header=True)
+yellow_pickup_dataset.toPandas().to_csv(dataset_folder + "yellow_pickup_image_data.csv", header=True)
 print("Elaborating 4")
-#yellow_dropoff_dataset.toPandas().to_csv(dataset_folder + "yellow_dropoff_image_data.csv", header=True)
+yellow_dropoff_dataset.toPandas().to_csv(dataset_folder + "yellow_dropoff_image_data.csv", header=True)
 print("Elaborating 5")
-#green_pickup_dataset.toPandas().to_csv(dataset_folder + "green_pickup_image_data.csv", header=True)
+green_pickup_dataset.toPandas().to_csv(dataset_folder + "green_pickup_image_data.csv", header=True)
 print("Elaborating 6")
-#green_dropoff_dataset.toPandas().to_csv(dataset_folder + "green_dropoff_image_data.csv", header=True)
+green_dropoff_dataset.toPandas().to_csv(dataset_folder + "green_dropoff_image_data.csv", header=True)
 
 
 image_names = ["pickup_image_data", "dropoff_image_data", "yellow_pickup_image_data", "yellow_dropoff_image_data", "green_pickup_image_data", "green_dropoff_image_data"]
@@ -125,46 +149,13 @@ def elaborate_image(image_name):
 
     np.save(dataset_folder + image_name, counts)
 
-#pool = multiprocessing.Pool(6)
-#pool.map(elaborate_image, image_names)
+#Translates intermediate results to image pixels
+pool = multiprocessing.Pool(6)
+pool.map(elaborate_image, image_names)
 
+#Produces images
 for image_name in image_names:
 
     counts = np.load(dataset_folder + image_name + ".npy")
     counts = np.log(counts + 1)
     plt.imsave(dataset_folder + image_name +".png", counts, dpi=4000, cmap="Greys")
-
-'''
-image = pd.read_csv(dataset_folder + "data_image.csv")
-
-counts = np.zeros((res_lat, res_lat))
-
-np.save("zeros.np", counts)
-
-print(image)
-
-for index, row in image.iterrows():
-    if index % 4000 == 0:
-        print(index)
-    counts[int(row["lat_index"]), int(row["lng_index"])] = int(row["count"])
-
-print(counts)
-
-np.save("image_matrix.np", counts)
-
-counts = np.load("image_matrix.np.npy")
-counts = np.log(counts + 1)
-
-
-#plt.matshow(counts, cmap="hot")
-#plt.show()
-#plt.matshow(counts, cmap="viridis")
-#plt.show()
-#plt.matshow(counts, cmap="cool")
-#plt.show()
-#plt.matshow(counts, cmap="gnuplot")
-#plt.show()
-#plt.savefig("map_900.pdf", dpi=900, format="pdf")
-plt.imsave("map.png", counts, dpi=2000)
-
-'''

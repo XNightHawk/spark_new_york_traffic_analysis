@@ -1,5 +1,18 @@
 '''
+
+  ________    ______   ______     _          ____        __
+ /_  __/ /   / ____/  /_  __/____(_)___     / __ \____ _/ /_____ _
+  / / / /   / /        / / / ___/ / __ \   / / / / __ `/ __/ __ `/
+ / / / /___/ /___     / / / /  / / /_/ /  / /_/ / /_/ / /_/ /_/ /
+/_/ /_____/\____/    /_/ /_/  /_/ .___/  /_____/\__,_/\__/\__,_/
+                               /_/
+
+
+Authors: Willi Menapace <willi.menapace@studenti.unitn.it>
+         Luca Zanells <luca.zanella-3@studenti.unitn.it>
+
 Creates a network graph of the taxi zones
+
 '''
 
 import builtins

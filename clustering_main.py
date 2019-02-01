@@ -1,5 +1,31 @@
 '''
-Statistical data analysis routines
+
+  ________    ______   ______     _          ____        __
+ /_  __/ /   / ____/  /_  __/____(_)___     / __ \____ _/ /_____ _
+  / / / /   / /        / / / ___/ / __ \   / / / / __ `/ __/ __ `/
+ / / / /___/ /___     / / / /  / / /_/ /  / /_/ / /_/ / /_/ /_/ /
+/_/ /_____/\____/    /_/ /_/  /_/ .___/  /_____/\__,_/\__/\__,_/
+                               /_/
+
+
+Authors: Willi Menapace <willi.menapace@studenti.unitn.it>
+         Luca Zanells <luca.zanella-3@studenti.unitn.it>
+
+Dataset clustering
+You may want to skip the k elbow error calculation, the best k=5 is already given
+By using the given clustering_model.model file you may skip the whole clustering phase to produce just
+the clustered dataset
+
+IMPORTANT: Please also ensure that Spark driver memory is set in your spark configuration files
+           to a sufficient amount (>= 2g), otherwise you may experience spark running out of memory while writing
+           parquet results
+
+Required files: Clean dataset
+
+Parameters to set:
+master -> The url for the spark cluster, set to local for your convenience
+dataset_folder -> Location of the dataset
+results_folder -> Location where to save results
 '''
 
 import pyspark
@@ -32,6 +58,9 @@ partial_clustering_features_property = 'partial_features'
 clustering_features_property = 'clustering_features'
 
 def cluster(dataset, spark, max_clusters = 5, max_iterations = 40, clustering_prediction_property = "clustering_predictions"):
+    '''
+    Performs clustering on the given dataset
+    '''
 
     taxi_company_indexer = StringIndexer(inputCol=taxi_company_property, outputCol=taxi_company_indexed_property)
 
@@ -57,7 +86,14 @@ def cluster(dataset, spark, max_clusters = 5, max_iterations = 40, clustering_pr
 
     return model
 
-def compute_k_elbow(dataset, spark, save_results_folder, k_from=3, k_to=10, step_size=2, training_fraction=0.001):
+def compute_k_elbow(dataset, spark, save_results_folder, k_from=3, k_to=10, step_size=2, training_fraction=0.001, evaluation_fraction=0.1):
+    '''
+    Computes the clustering error curve as a function of k
+    Saves obtained errors in text files
+
+    Training fraction and evaluation fraction control the portion of the dataset used for clustering and evaluation
+    of clustering error. You may want to regulate that according to your available computing power
+    '''
 
     k_results = {}
 
@@ -76,7 +112,7 @@ def compute_k_elbow(dataset, spark, save_results_folder, k_from=3, k_to=10, step
         for i in range(kmeans_stage):
             featured_dataset = clustering_model.stages[i].transform(featured_dataset)
 
-        current_result = clustering_model.stages[kmeans_stage].computeCost(featured_dataset)
+        current_result = clustering_model.stages[kmeans_stage].computeCost(featured_dataset.sample(evaluation_fraction))
 
         print("Current cost " + str(current_result))
         out_file = open(save_results_folder + 'k_' + str(k), 'w')
@@ -91,7 +127,6 @@ master = 'local[7]'
 
 sc = pyspark.SparkContext()
 spark = SparkSession.builder.appName(appName).getOrCreate()
-
 
 dataset_folder = '/home/bigdata/auxiliary/'
 results_folder = '/home/bigdata/auxiliary/stats/'
@@ -137,17 +172,16 @@ def timestamp_diff(end_time, start_time):
 
 spark.udf.register("timestamp_diff", timestamp_diff, IntegerType())
 
-#dataset.printSchema()
-#dataset.show()
 
-#Obtained that the best 4 for the current dataset is k=4
-k_results = compute_k_elbow(dataset, spark, results_folder, k_from=4 , k_to=20, step_size=1, training_fraction=0.025)
+#Obtained that the best k for the current dataset is k=5
+#NOTE: comment line to skip the calculation
+k_results = compute_k_elbow(dataset, spark, results_folder, k_from=7, k_to=20, step_size=1, training_fraction=0.025)
 
 clustering_training_dataset = dataset.sample(0.03)
 
-'''
-
-clustering_model = cluster(clustering_training_dataset, spark, max_clusters = 4, max_iterations = 40, clustering_prediction_property = clustering_class_property)
+#Build the final clustering model
+#NOTE: comment line to skip clustering if the clustering model is already present in the dataset folder
+clustering_model = cluster(clustering_training_dataset, spark, max_clusters = 5, max_iterations = 40, clustering_prediction_property = clustering_class_property)
 
 try:
     clustering_model.save('file://' + dataset_folder + 'clustering_model.model')
@@ -175,4 +209,3 @@ clustered_dataset = clustered_dataset.drop(partial_clustering_features_property)
 clustered_dataset = clustered_dataset.drop(clustering_features_property)
 
 clustered_dataset.write.parquet('file://' + dataset_folder + 'clustered_dataset.parquet')
-'''

@@ -1,5 +1,27 @@
 '''
-Compression utility from .tar.gz format to parquet for original data
+
+  ________    ______   ______     _          ____        __
+ /_  __/ /   / ____/  /_  __/____(_)___     / __ \____ _/ /_____ _
+  / / / /   / /        / / / ___/ / __ \   / / / / __ `/ __/ __ `/
+ / / / /___/ /___     / / / /  / / /_/ /  / /_/ / /_/ / /_/ /_/ /
+/_/ /_____/\____/    /_/ /_/  /_/ .___/  /_____/\__,_/\__/\__,_/
+                               /_/
+
+
+Authors: Willi Menapace <willi.menapace@studenti.unitn.it>
+         Luca Zanells <luca.zanella-3@studenti.unitn.it>
+
+Dataset compression from tar.gz format to parquet format
+
+Required files: tar.gz compressed dataset
+
+IMPORTANT: Please also ensure that Spark driver memory is set in your spark configuration files
+           to a sufficient amount (>= 2g), otherwise you may experience spark running out of memory while writing
+           parquet results
+
+Parameters to set:
+master -> The url for the spark cluster, set to local for your convenience
+conversion_folder -> Location of the dataset and results
 '''
 
 import pyspark

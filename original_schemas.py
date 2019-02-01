@@ -1,8 +1,19 @@
 '''
-Schemas of original data from source
 
-Some fields may not have the exact name as in the original data archives in order to achieve better uniformity,
-but retain the same semantic
+  ________    ______   ______     _          ____        __
+ /_  __/ /   / ____/  /_  __/____(_)___     / __ \____ _/ /_____ _
+  / / / /   / /        / / / ___/ / __ \   / / / / __ `/ __/ __ `/
+ / / / /___/ /___     / / / /  / / /_/ /  / /_/ / /_/ / /_/ /_/ /
+/_/ /_____/\____/    /_/ /_/  /_/ .___/  /_____/\__,_/\__/\__,_/
+                               /_/
+
+
+Authors: Willi Menapace <willi.menapace@studenti.unitn.it>
+         Luca Zanells <luca.zanella-3@studenti.unitn.it>
+
+Schemas of original data
+
+Some fields may not have the same name as in the original data archives in order to achieve better uniformity
 '''
 
 import pyspark

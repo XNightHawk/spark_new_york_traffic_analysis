@@ -1,12 +1,31 @@
+'''
+
+  ________    ______   ______     _          ____        __
+ /_  __/ /   / ____/  /_  __/____(_)___     / __ \____ _/ /_____ _
+  / / / /   / /        / / / ___/ / __ \   / / / / __ `/ __/ __ `/
+ / / / /___/ /___     / / / /  / / /_/ /  / /_/ / /_/ / /_/ /_/ /
+/_/ /_____/\____/    /_/ /_/  /_/ .___/  /_____/\__,_/\__/\__,_/
+                               /_/
+
+
+Authors: Willi Menapace <willi.menapace@studenti.unitn.it>
+         Luca Zanells <luca.zanella-3@studenti.unitn.it>
+
+Compares taxis to FHV services using a pre elaborated dataset to avoid downloading the FHV dataset
+
+Required files: daily_trips_by_geography.csv
+
+Parameters to set:
+master -> The url for the spark cluster, set to local for your convenience
+dataset_folder -> Location of the dataset
+results_folder -> Location where to save results
+'''
+
 import pyspark
-from pyspark.ml import Pipeline
 from pyspark.sql import SparkSession
 import pyspark.sql.functions
 from pyspark.sql.types import *
 from pyspark.sql.functions import *
-
-from pyspark.ml.clustering import KMeans
-from pyspark.ml.feature import OneHotEncoder, StringIndexer, VectorAssembler, StandardScaler, OneHotEncoderEstimator
 
 import schema_conversion
 from schema import *

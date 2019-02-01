@@ -1,6 +1,37 @@
 '''
-Converts parquet files in the original schema to parquet files with the common schema
+
+  ________    ______   ______     _          ____        __
+ /_  __/ /   / ____/  /_  __/____(_)___     / __ \____ _/ /_____ _
+  / / / /   / /        / / / ___/ / __ \   / / / / __ `/ __/ __ `/
+ / / / /___/ /___     / / / /  / / /_/ /  / /_/ / /_/ / /_/ /_/ /
+/_/ /_____/\____/    /_/ /_/  /_/ .___/  /_____/\__,_/\__/\__,_/
+                               /_/
+
+
+Authors: Willi Menapace <willi.menapace@studenti.unitn.it>
+         Luca Zanells <luca.zanella-3@studenti.unitn.it>
+
+Converts parquet files in the original schema to parquet files with the common schema performing
+also coordinate conversion
+The code is non trivial, so the reader may want to refer to the corresponding section of the report
+to understand the flow of execution
+You may want to skip the calculation of the lookup matrix by ensuring lookup_matrix_1000_3.npy is
+present in the current directory
+
+IMPORTANT: Please also ensure that Spark driver memory is set in your spark configuration files
+           to a sufficient amount (>= 2g), otherwise you may experience spark running out of memory while writing
+           parquet results
+
+Required files: Original dataset in parquet format
+                NYC taxi zones shapefile, already available in the repository
+
+Parameters to set:
+master -> The url for the spark cluster, set to local for your convenience
+dataset_folder -> Location of the dataset
+results_folder -> Location where to save results
+shapefile_path -> Location where to read the NYC taxi zones shapefile
 '''
+
 
 import os
 import random
@@ -21,10 +52,14 @@ def check_x_y_validity_local(x, y, minx_global, miny_global, maxx_global, maxy_g
     else:
         return False
 
-#Helper function for the creation of the lookup matrix.
-#Associates coordinates to a location using a lookup matrix
-#Directly uses transformed coordinates x and y
+
 def lat_long_2_shape(x, y, shape_matrix, dx, dy, minx_global, miny_global, maxx_global, maxy_global):
+    '''
+    Helper function for the creation of the lookup matrix.
+    Associates coordinates to a location using a lookup matrix
+    Directly uses transformed coordinates x and y
+    '''
+
     not_found = None
 
     if check_x_y_validity_local(x, y, minx_global, miny_global, maxx_global, maxy_global):
@@ -60,10 +95,12 @@ def lat_long_2_shape(x, y, shape_matrix, dx, dy, minx_global, miny_global, maxx_
         # If the point (x, y) is not within boundaries
         return not_found
 
-#Creates a refined lookup matrix for coordinates conversion to locations
-#Accepts a shapefile, the number of cells in each dimension of the matrix, a density for probing points and a location
-#where to save or load the created matrix for better performance
 def initialize_lookup_matrix(zones_shapes, num_tiles, probing_density, save_location='', load_location=''):
+    '''
+    Creates a refined lookup matrix for coordinates conversion to locations
+    Accepts a shapefile, the number of cells in each dimension of the matrix, a density for probing points and a location
+    where to save or load the created matrix for better performance
+    '''
 
     minx_global, miny_global, maxx_global, maxy_global = zones_shapes.bounds
 
@@ -149,8 +186,10 @@ def initialize_lookup_matrix(zones_shapes, num_tiles, probing_density, save_loca
 
     return (matrix, dx, dy, minx_global, miny_global, maxx_global, maxy_global, in_proj, out_proj)
 
-#Builds an approximate lookup matrix that to each cell associates exactly one locaiton id, -1 if no zone is present
 def initialize_stripped_lookup_matrix(matrix):
+    '''
+    Builds an approximate lookup matrix that to each cell associates exactly one locaiton id, -1 if no zone is present
+    '''
 
     print("Stripping lookup matrix")
     rows, columns = matrix.shape
@@ -169,7 +208,7 @@ def initialize_stripped_lookup_matrix(matrix):
     print("Lookup matrix stripped")
     return stripped_matrix
 
-
+master = "local[*]"
 appName = 'Parquet Common Schema Converter'
 
 #Please also ensure that Spark driver memory is set in the configuration files
@@ -177,7 +216,7 @@ appName = 'Parquet Common Schema Converter'
 conf = pyspark.SparkConf()
 conf.set("spark.executor.memory", '1g')
 conf.set('spark.executor.cores', '1')
-conf.setMaster("local[*]")
+conf.setMaster(master)
 
 sc = pyspark.SparkContext(conf=conf)
 spark = SparkSession.builder.appName(appName).getOrCreate()
@@ -224,9 +263,12 @@ def check_x_y_validity(x, y):
     else:
         return False
 
-#Hi performance approximate version of zone association routine
-#Associates ech coordinate with a zone
 def lat_long_2_location_ID_hi_perf(input_lat, input_lon):
+    '''
+    Hi performance approximate version of zone association routine
+    Associates ech coordinate with a zone
+    '''
+
     #Importing module locally avoids its serialization
     import pyproj
 
@@ -259,7 +301,6 @@ vendor_id_string_2_id_udf = pyspark.sql.functions.udf(schema_conversion.vendor_s
 payment_type_string_2_id_udf = pyspark.sql.functions.udf(schema_conversion.payment_type_string_2_id, IntegerType())
 
 dataset_folder = '/home/bigdata/auxiliary/'
-results_folder = '/home/bigdata/auxiliary/'
 conversion_folder = '/home/bigdata/auxiliary/'
 
 #Build an entry for each archive to treat attaching the relative schema conversion routine to each one

@@ -7,6 +7,7 @@
 \usepackage{float}
 \usepackage{subfig}
 \usepackage{url}
+\usepackage[htt]{hyphenat}
 
 \begin{document}
 
@@ -83,22 +84,22 @@ After acquisition of the data we proceed to compress it to .tar.gz format in ord
 The parquet dataset is then transformed into a common schema format to uniform the data and ease the analysis. We decide to adopt the following schema:
 
 \begin{itemize}
-	\item taxi\_company, ``green'' or ``yellow'' according to the taxi type that served the trip
-	\item pickup\_datetime, date and time of the pickup
-	\item dropoff\_datetime, date and time of the dropoff
-	\item pickup\_location\_id, taxi zone id where the pickup happened, -1 if the zone is unknown
-	\item dropoff\_location\_id, taxi zone id where the dropoff happened, -1 if the zone is unknown
-	\item passenger\_count, number of passengers onboard
-	\item trip\_distance, the metered distance in miles
-	\item ratecode\_id, the fare rate used for the calculation of the amount, which includes special rates for JFK or Newark trips.
-	\item fare\_amount, the fare amount for the trip in \$
-	\item tolls\_amount, the amount of tolls in \$
-	\item total\_amount, the total amount for the trip in \$. It includes tips only for credit card payments.
-	\item mta\_tax, the amount due to MTA tax in \$
-	\item improvement\_surcharge, the amount due to the improvement surcharge in \$
-	\item extra, the amount due to extra in \$ including only rush hour and overnight charges
-	\item tip\_amount, the tip amount in \$. It is set only for credit card payments
-	\item payment\_type, the used payment method
+	\item \path{taxi_company}, ``green'' or ``yellow'' according to the taxi type that served the trip
+	\item \path{pickup_datetime}, date and time of the pickup
+	\item \path{dropoff_datetime}, date and time of the dropoff
+	\item \path{pickup_location_id}, taxi zone id where the pickup happened, -1 if the zone is unknown
+	\item \path{dropoff_location_id}, taxi zone id where the dropoff happened, -1 if the zone is unknown
+	\item \path{passenger_count}, number of passengers onboard
+	\item \path{trip_distance}, the metered distance in miles
+	\item \path{ratecode_id}, the fare rate used for the calculation of the amount, which includes special rates for JFK or Newark trips.
+	\item \path{fare_amount}, the fare amount for the trip in \$
+	\item \path{tolls_amount}, the amount of tolls in \$
+	\item \path{total_amount}, the total amount for the trip in \$. It includes tips only for credit card payments.
+	\item \path{mta_tax}, the amount due to MTA tax in \$
+	\item \path{improvement_surcharge}, the amount due to the improvement surcharge in \$
+	\item \path{extra}, the amount due to extra in \$ including only rush hour and overnight charges
+	\item \path{tip_amount}, the tip amount in \$. It is set only for credit card payments
+	\item \path{payment_type}, the used payment method
 \end{itemize}
 
 Note that the common schema codifies the pickup and dropoff locations as the ids of the zone where the pickup or the dropoff happened and not as coordinates. The main challenge for schema conversion is the transformation of dropoff and pickup locations expressed as coordinates into the respective taxi zones. The dataset is accompanied by a shapefile which specifies the geographical boundaries of each zone. Unfortunately, naive algorithms for dataset conversion directly using the shapefile are able to only convert some tens of records per second per processor which would make the conversion of 1 Billion of records unfeasible. Instead, we decide to develop a more efficient algorithm for zone association which makes use of look up tables to increase the performance of the conversion up to the thousands of records per second, allowing the complete conversion of the dataset.
@@ -547,6 +548,68 @@ Further topics of interest which have not been analyzed at the moment include a 
 \balancecolumns
 \appendix
 %Appendix A
-\section{Headings in Appendices}
-First appendix
+\section{Files and Script Execution}
+
+This appendix describes the contents of the code repository and describes what is needed in order to run the scripts.
+
+The code repository is composed of the following parts:
+
+\begin{itemize}
+	\item Spark Python files in the root directory
+	\item R scripts for the production of plots and additional data analysis in the R folder
+	\item Report files for the production of the current document in the report directory
+	\item Docs and additional material in the docs directory
+\end{itemize}
+
+Moreover the shared Google Drive directory contains the following elements:
+
+\begin{itemize}
+	\item \texttt{.tar.gz} compressed dataset from 2010 to 2018 for yellow and green taxis 
+	\item \texttt{clustering\_model.model} precomputed clustering model
+	\item \texttt{daily\_trips\_by\_geography.csv} public archive from toddwschneider containing aggregate information about for hire vehicle operations in New York City
+	\item \texttt{stats.zip}, \texttt{clustered\_stats.zip}, \texttt{airport\_stats.zip}, the data statistics produced by running the Spark scripts on the dataset.
+	\item \texttt{plots.zip}, \texttt{clustered\_plots.zip}, \texttt{airport\_plots.zip}, the plots resulting from running R on Spark results.
+\end{itemize}
+
+In order to obtain the results presented in the record the following steps must be carried out in this order:
+
+\begin{itemize}
+	\item Install Python packages \texttt{matplotlib}, \texttt{numpy}, \texttt{pandas}, \texttt{networkx}, \texttt{fiona}, \texttt{shapely}.
+	\item Import the compressed .tar.gz dataset in your cluster infrastructure and convert it in parquet format executing the gz\_to\_parquet\_main.py script. The script needs to be configured as described in its header.
+	\item Convert the different dataset years into a dataset with common schema using the \path{common_schema_conversion_main.py} script. The script needs to be configured as described in its header. In particular you need to ensure that the shapefile in the docs folder is available to the main script. Having the \path{lookup_matrix_1000_3.npy} precomputed lookup matrix in the same folder as the python script avoids its recalculation.
+	\item Perform data cleaning by executing \path{data_cleaning_main.py} in order to produce the cleaned dataset. Follow the instruction in the script header to configure it before execution.
+	\item Perform clustering. The full clustering procedure is the longest and most expensive part of the processing. For this reason we provide the precomputed \path{clustering_model.model} precomputed clustering model along with the dataset. If you insert it in the dataset folder you can comment the lines in the code performing clustering and model saving and direct apply the clustering model to your dataset, producing the clustered dataset. Please refer to the file header to correctly configure your script. If you wish to execute the complete clustering procedure, you may execute the script directly after the required parameters are inserted without commenting out portions of the code.
+	\item Obtain the main data statistics by executing \path{data_statistics_main.py}. Please refer to the header file for correct script configuration. The results in form of .csv files can be subsequently used by the R scripts.
+	\item Obtain the clustered data statistics by executing the same script, but setting \texttt{clustered\_analysis} to True. Remember to save the results in a different folder in order to be able to import them in R more easily in later steps.
+	\item Obtain the airport statistics by executing \path{airport_data_statistics_main.py}. Please refer to the header file for correct script configuration.
+	\item (Optional) Execute \path{data_imaging_main.py} in order to obtain plots such as the one of \cref{fig:companyDivisionImageMap}.
+	\item (Optional) Execute \path{graph_building_main.py} in order to obtain an interactive graph visualization of the taxi zones.
+	\item Install R packages \texttt{ggplot2}, \texttt{RColorBrewer},\texttt{rgdal}, \texttt{ggmap}
+	\item Configure and execute \texttt{R/main.R} in order to obtain the first set of plots. In particular the script needs to be given the location of the .csv files obtained during the main analysis step.
+	\item Configure and execute \path{R/airport_main.R} in order to obtain the first set of plots. In particular the script needs to be given the location of the .csv files obtained during the airport analysis step.
+	\item Configure and execute \path{R/clustering_main.R} in order to obtain the first set of plots. In particular the script needs to be given the location of the .csv files obtained during the clustered analysis step.
+\end{itemize}
+
+It may be possible that some other minor steps or slight modification to the code (such as specifying file access protocols \path{hdfs:\\} instead of \path{file:\\}) are required in order to completely run the code on the system of the reader.
+
+If you are interested only in seeing the result .csv files or in running the R scripts to produce the plots you can avoid running Spark entirely and use the \texttt{stats.zip}, \texttt{clustered\_stats.zip} and \texttt{airport\_stats.zip} archives available in the Google Drive folder to obtain the results of Spark elaborations. If you are interested only in seeing the plots you can download the corresponding zip archives from the Google Drive folder.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 \end{document}

@@ -1,3 +1,19 @@
+'''
+
+  ________    ______   ______     _          ____        __
+ /_  __/ /   / ____/  /_  __/____(_)___     / __ \____ _/ /_____ _
+  / / / /   / /        / / / ___/ / __ \   / / / / __ `/ __/ __ `/
+ / / / /___/ /___     / / / /  / / /_/ /  / /_/ / /_/ / /_/ /_/ /
+/_/ /_____/\____/    /_/ /_/  /_/ .___/  /_____/\__,_/\__/\__,_/
+                               /_/
+
+
+Authors: Willi Menapace <willi.menapace@studenti.unitn.it>
+         Luca Zanells <luca.zanella-3@studenti.unitn.it>
+
+Core utilities for data analysis
+'''
+
 import pyspark
 from pyspark.ml import Pipeline
 from pyspark.sql import SparkSession
@@ -256,9 +272,9 @@ def compute_average_distance_by_pickup_location(dataset, result_filename, show=F
 def compute_average_speed_by_pickup_location(dataset, result_filename, show=False, separe_clusters=False):
 
     if separe_clusters == False:
-        dataset = dataset.select(pickup_location_id_property, speed_column(dataset, "avg_speed")).groupBy(pickup_location_id_property).avg("avg_speed")
+        dataset = dataset.select(pickup_location_id_property, speed_column(dataset, "avg_speed")).where(col("avg_speed") < 60).groupBy(pickup_location_id_property).avg("avg_speed")
     else:
-        dataset = dataset.select(pickup_location_id_property, speed_column(dataset, "avg_speed"), clustering_class_property).groupBy(pickup_location_id_property, clustering_class_property).avg("avg_speed")
+        dataset = dataset.select(pickup_location_id_property, speed_column(dataset, "avg_speed"), clustering_class_property).where(col("avg_speed") < 60).groupBy(pickup_location_id_property, clustering_class_property).avg("avg_speed")
 
     if show:
         dataset.cache()
@@ -266,7 +282,7 @@ def compute_average_speed_by_pickup_location(dataset, result_filename, show=Fals
     dataset.toPandas().to_csv(result_filename, header=True)
 
     if show:
-        dataset.show()
+        dataset.show(200)
         dataset.unpersist()
 
 

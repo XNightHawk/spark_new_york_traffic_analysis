@@ -1,16 +1,31 @@
 '''
-Statistical data analysis routines
+
+  ________    ______   ______     _          ____        __
+ /_  __/ /   / ____/  /_  __/____(_)___     / __ \____ _/ /_____ _
+  / / / /   / /        / / / ___/ / __ \   / / / / __ `/ __/ __ `/
+ / / / /___/ /___     / / / /  / / /_/ /  / /_/ / /_/ / /_/ /_/ /
+/_/ /_____/\____/    /_/ /_/  /_/ .___/  /_____/\__,_/\__/\__,_/
+                               /_/
+
+
+Authors: Willi Menapace <willi.menapace@studenti.unitn.it>
+         Luca Zanells <luca.zanella-3@studenti.unitn.it>
+
+Statistical data analysis of airport data
+
+Required files: Clustered dataset
+
+Parameters to set:
+master -> The url for the spark cluster, set to local for your convenience
+dataset_folder -> Location of the dataset
+results_folder -> Location where to save results
 '''
 
 import pyspark
-from pyspark.ml import Pipeline
 from pyspark.sql import SparkSession
 import pyspark.sql.functions
 from pyspark.sql.types import *
 from pyspark.sql.functions import *
-
-from pyspark.ml.clustering import KMeans
-from pyspark.ml.feature import OneHotEncoder, StringIndexer, VectorAssembler, StandardScaler, OneHotEncoderEstimator
 
 import schema_conversion
 from schema import *
@@ -23,7 +38,6 @@ master = 'local[*]'
 
 sc = pyspark.SparkContext()
 spark = SparkSession.builder.appName(appName).getOrCreate()
-
 
 dataset_folder = '/home/bigdata/auxiliary/'
 results_folder = '/home/bigdata/auxiliary/airport_stats/'
@@ -66,6 +80,7 @@ if not clustered_dataset:
 else:
     dataset = spark.read.parquet('file://' + dataset_folder + 'clustered_dataset.parquet')
 
+#Dataset without airport trip filtering
 original_dataset = dataset
 
 #Filters data relative to airports only
@@ -73,16 +88,13 @@ original_dataset = dataset
 airport_locations = [132, 138]
 dataset = dataset.filter(dataset[dropoff_location_id_property].isin(airport_locations) | dataset[pickup_location_id_property].isin(airport_locations) | (dataset[ratecode_id_property] == 3))
 
-#dataset.printSchema()
-#dataset.show()
-
-#compute_pickup_hour_distribution(dataset, results_folder + "pickup_hour_dist.csv", True, clustered_analysis)
-#compute_pickup_yearday_distribution(dataset, results_folder + "pickup_yearday_dist.csv", True, clustered_analysis)
-#compute_pickup_weekday_distribution(dataset, results_folder + "pickup_weekday_dist.csv", True, clustered_analysis)
-#compute_pickup_month_distribution(dataset, results_folder + "pickup_month_dist.csv", True, clustered_analysis)
-#compute_pickup_location_id_distribution(dataset, results_folder + "pickup_location_id_dist.csv", True, clustered_analysis)
-#compute_dropoff_location_id_distribution(dataset, results_folder + "dropoff_location_id_dist.csv", True, clustered_analysis)
-#compute_passenger_count_distribution(dataset, results_folder + "passenger_count_dist.csv", True, clustered_analysis)
+compute_pickup_hour_distribution(dataset, results_folder + "pickup_hour_dist.csv", True, clustered_analysis)
+compute_pickup_yearday_distribution(dataset, results_folder + "pickup_yearday_dist.csv", True, clustered_analysis)
+compute_pickup_weekday_distribution(dataset, results_folder + "pickup_weekday_dist.csv", True, clustered_analysis)
+compute_pickup_month_distribution(dataset, results_folder + "pickup_month_dist.csv", True, clustered_analysis)
+compute_pickup_location_id_distribution(dataset, results_folder + "pickup_location_id_dist.csv", True, clustered_analysis)
+compute_dropoff_location_id_distribution(dataset, results_folder + "dropoff_location_id_dist.csv", True, clustered_analysis)
+compute_passenger_count_distribution(dataset, results_folder + "passenger_count_dist.csv", True, clustered_analysis)
 compute_trip_duration_distribution(dataset, results_folder + "trip_duration_dist.csv", True, clustered_analysis)
 compute_trip_distance_by_pickup_hour_distribution(dataset, results_folder + "trip_distance_by_pickup_hour_dist.csv", True, clustered_analysis)
 compute_trip_duration_by_pickup_hour_distribution(dataset, results_folder + "trip_duration_by_pickup_hour_dist.csv", True, clustered_analysis)

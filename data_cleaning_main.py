@@ -1,5 +1,29 @@
 '''
-Statistical data analysis routines
+
+  ________    ______   ______     _          ____        __
+ /_  __/ /   / ____/  /_  __/____(_)___     / __ \____ _/ /_____ _
+  / / / /   / /        / / / ___/ / __ \   / / / / __ `/ __/ __ `/
+ / / / /___/ /___     / / / /  / / /_/ /  / /_/ / /_/ / /_/ /_/ /
+/_/ /_____/\____/    /_/ /_/  /_/ .___/  /_____/\__,_/\__/\__,_/
+                               /_/
+
+
+Authors: Willi Menapace <willi.menapace@studenti.unitn.it>
+         Luca Zanells <luca.zanella-3@studenti.unitn.it>
+
+Converts parquet files in the common formal to a unified, cleaned dataset
+Refer to docs/table_schema.txt for more details on the cleaning constraints for each field
+
+IMPORTANT: Please also ensure that Spark driver memory is set in your spark configuration files
+           to a sufficient amount (>= 2g), otherwise you may experience spark running out of memory while writing
+           parquet results
+
+Required files: Common format dataset in parquet format
+
+Parameters to set:
+master -> The url for the spark cluster, set to local for your convenience
+read_dataset_folder -> Location from which to read the dataset
+dataset_folder -> Location to which to write the cleaned dataset
 '''
 
 import pyspark
@@ -12,8 +36,10 @@ import schema_conversion
 from schema import *
 from computed_columns import *
 
-#Filters dataset returning the filtered one
 def clean(dataset):
+    '''
+    Filters dataset returning the filtered one
+    '''
 
     #Not used columns which contain many nulls
     dataset = dataset.drop(store_and_forward_flag_property)
@@ -52,10 +78,8 @@ master = 'local[*]'
 sc = pyspark.SparkContext()
 spark = SparkSession.builder.appName(appName).getOrCreate()
 
-
-read_dataset_folder = '/media/sf_dataset/'
+read_dataset_folder = '/home/bigdata/auxiliary/'
 dataset_folder = '/home/bigdata/auxiliary/'
-results_folder = '/home/bigdata/auxiliary/stats/'
 
 #Build an entry for each archive to treat attaching the relative schema conversion routine to each one
 archives = []
@@ -94,19 +118,3 @@ cleaned_dataset = spark.read.parquet('file://' + dataset_folder + 'clean_dataset
 
 cleaned_dataset.show()
 print('Cleaned dataset rows: ' + str(cleaned_dataset.count()))
-
-'''
-+----+---------+---------+
-|year|    count|    count|
-+----+---------+---------+
-|2018| 58662122| 57851963|
-|2015|165346754|162016920|
-|2013|174390570|145694659|
-|2014|180951362|153587835|
-|2012|178544327|146929996|
-|2016| 82194995| 76691065|
-|2010|168994554| 67084908|
-|2011|176897208|143835122|
-|2017|125237446|124260524|
-+----+---------+---------+
-'''

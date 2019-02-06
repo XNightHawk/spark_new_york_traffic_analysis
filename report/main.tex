@@ -566,19 +566,20 @@ Moreover the shared Google Drive directory contains the following elements:
 \begin{itemize}
 	\item \texttt{.tar.gz} compressed dataset from 2010 to 2018 for yellow and green taxis 
 	\item \texttt{clustering\_model.model} precomputed clustering model
+	\item \texttt{clustered\_dataset.parquet} precomputed dataset, ready for the analysis
 	\item \texttt{daily\_trips\_by\_geography.csv} public archive from toddwschneider containing aggregate information about for hire vehicle operations in New York City
 	\item \texttt{stats.zip}, \texttt{clustered\_stats.zip}, \texttt{airport\_stats.zip}, the data statistics produced by running the Spark scripts on the dataset.
 	\item \texttt{plots.zip}, \texttt{clustered\_plots.zip}, \texttt{airport\_plots.zip}, the plots resulting from running R on Spark results.
 \end{itemize}
 
-In order to obtain the results presented in the record the following steps must be carried out in this order:
+In order to obtain from scratch the results presented in the report, the following steps must be carried out in this order, but you may use intermediate results to speed up the process if you wish to, as described later in this section:
 
 \begin{itemize}
 	\item Install Python packages \texttt{matplotlib}, \texttt{numpy}, \texttt{pandas}, \texttt{networkx}, \texttt{fiona}, \texttt{shapely}.
 	\item Import the compressed .tar.gz dataset in your cluster infrastructure and convert it in parquet format executing the gz\_to\_parquet\_main.py script. The script needs to be configured as described in its header.
 	\item Convert the different dataset years into a dataset with common schema using the \path{common_schema_conversion_main.py} script. The script needs to be configured as described in its header. In particular you need to ensure that the shapefile in the docs folder is available to the main script. Having the \path{lookup_matrix_1000_3.npy} precomputed lookup matrix in the same folder as the python script avoids its recalculation.
 	\item Perform data cleaning by executing \path{data_cleaning_main.py} in order to produce the cleaned dataset. Follow the instruction in the script header to configure it before execution.
-	\item Perform clustering. The full clustering procedure is the longest and most expensive part of the processing. For this reason we provide the precomputed \path{clustering_model.model} precomputed clustering model along with the dataset. If you insert it in the dataset folder you can comment the lines in the code performing clustering and model saving and direct apply the clustering model to your dataset, producing the clustered dataset. Please refer to the file header to correctly configure your script. If you wish to execute the complete clustering procedure, you may execute the script directly after the required parameters are inserted without commenting out portions of the code.
+	\item Perform clustering. The full clustering procedure is the longest and most expensive part of the processing. For this reason we provide the precomputed \path{clustering_model.model} precomputed clustering model along with the dataset. If you insert it in the dataset folder you can comment the lines in the code performing clustering and model saving and direct apply the clustering model to your dataset, producing the clustered dataset. You may also skip the passages until this point by obtaining the \path{clustered_dataset.parquet} dataset from the Google Drive folder. Please refer to the file header to correctly configure your script. If you wish to execute the complete clustering procedure, you may execute the script directly after the required parameters are inserted without commenting out portions of the code.
 	\item Obtain the main data statistics by executing \path{data_statistics_main.py}. Please refer to the header file for correct script configuration. The results in form of .csv files can be subsequently used by the R scripts.
 	\item Obtain the clustered data statistics by executing the same script, but setting \texttt{clustered\_analysis} to True. Remember to save the results in a different folder in order to be able to import them in R more easily in later steps.
 	\item Obtain the airport statistics by executing \path{airport_data_statistics_main.py}. Please refer to the header file for correct script configuration.

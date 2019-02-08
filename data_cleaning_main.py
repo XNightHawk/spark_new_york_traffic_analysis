@@ -9,7 +9,8 @@
 
 
 Authors: Willi Menapace <willi.menapace@studenti.unitn.it>
-         Luca Zanells <luca.zanella-3@studenti.unitn.it>
+         Luca Zanella <luca.zanella-3@studenti.unitn.it>
+         Daniele Giuliani <daniele.giuliani@studenti.unitn.it>
 
 Converts parquet files in the common formal to a unified, cleaned dataset
 Refer to docs/table_schema.txt for more details on the cleaning constraints for each field

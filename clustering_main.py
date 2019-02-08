@@ -9,7 +9,8 @@
 
 
 Authors: Willi Menapace <willi.menapace@studenti.unitn.it>
-         Luca Zanells <luca.zanella-3@studenti.unitn.it>
+         Luca Zanella <luca.zanella-3@studenti.unitn.it>
+         Daniele Giuliani <daniele.giuliani@studenti.unitn.it>
 
 Dataset clustering
 You may want to skip the k elbow error calculation, the best k=5 is already given

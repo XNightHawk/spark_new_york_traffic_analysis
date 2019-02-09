@@ -9,7 +9,8 @@
 
 
 Authors: Willi Menapace <willi.menapace@studenti.unitn.it>
-         Luca Zanells <luca.zanella-3@studenti.unitn.it>
+         Luca Zanella <luca.zanella-3@studenti.unitn.it>
+         Daniele Giuliani <daniele.giuliani@studenti.unitn.it>
 
 Converts parquet files in the original schema to parquet files with the common schema performing
 also coordinate conversion

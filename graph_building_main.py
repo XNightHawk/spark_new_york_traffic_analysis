@@ -9,10 +9,22 @@
 
 
 Authors: Willi Menapace <willi.menapace@studenti.unitn.it>
-         Luca Zanells <luca.zanella-3@studenti.unitn.it>
+         Luca Zanella <luca.zanella-3@studenti.unitn.it>
+         Daniele Giuliani <daniele.giuliani@studenti.unitn.it>
 
 Creates a network graph of the taxi zones
 
+Required files: taxi_zone_lookup.csv
+                pickup_location_id_dist.csv
+                avg_distance_by_pickup_location.csv
+                avg_duration_by_pickup_location.csv
+                avg_speed_by_pickup_location.csv
+                avg_total_amount_by_pickup_location.csv
+                rank_by_pickup_location_and_dropoff_location.csv
+
+Parameters to set:
+dataset_folder -> Location of the dataset
+results_folder -> Location where to save results
 '''
 
 import builtins
@@ -30,7 +42,7 @@ import numpy as np
 import pandas as pd
 from schema import *
 
-dataset_folder = '/media/luca/TOSHIBA EXT/BigData/datasets/'
+dataset_folder = '/media/luca/TOSHIBA EXT/BigData/datasets/stats/'
 results_folder = '/media/luca/TOSHIBA EXT/BigData/datasets/stats/'
 
 location_id_property = 'LocationID'
@@ -42,8 +54,8 @@ avg_duration_property = 'avg(duration_seconds)'
 avg_speed_property = 'avg(avg_speed)'
 avg_total_amount_property = 'avg(total_amount)'
 
-max_rank = 30
-min_rank = 3
+max_rank = 10
+min_rank = 2
 
 low_level = 'LOW'
 medium_level = 'MEDIUM'
@@ -164,12 +176,12 @@ def get_rank_thresholds(dataset, max_rank, min_rank):
 
 
 taxi_zone_lookup = pd.read_csv('file://' + dataset_folder + 'taxi_zone_lookup.csv')
-pickup_location_id_dist = pd.read_csv('file://' + results_folder + 'pickup_location_id_dist.csv')
-avg_distance_by_pickup_location = pd.read_csv('file://' + results_folder + 'avg_distance_by_pickup_location.csv')
-avg_duration_by_pickup_location = pd.read_csv('file://' + results_folder + 'avg_duration_by_pickup_location.csv')
-avg_speed_by_pickup_location = pd.read_csv('file://' + results_folder + 'avg_speed_by_pickup_location.csv')
-avg_total_amount_by_pickup_location = pd.read_csv('file://' + results_folder + 'avg_total_amount_by_pickup_location.csv')
-rank_by_pickup_location_and_dropoff_location = pd.read_csv('file://' + results_folder + 'rank_by_pickup_location_and_dropoff_location.csv')
+pickup_location_id_dist = pd.read_csv('file://' + dataset_folder + 'pickup_location_id_dist.csv')
+avg_distance_by_pickup_location = pd.read_csv('file://' + dataset_folder + 'avg_distance_by_pickup_location.csv')
+avg_duration_by_pickup_location = pd.read_csv('file://' + dataset_folder + 'avg_duration_by_pickup_location.csv')
+avg_speed_by_pickup_location = pd.read_csv('file://' + dataset_folder + 'avg_speed_by_pickup_location.csv')
+avg_total_amount_by_pickup_location = pd.read_csv('file://' + dataset_folder + 'avg_total_amount_by_pickup_location.csv')
+rank_by_pickup_location_and_dropoff_location = pd.read_csv('file://' + dataset_folder + 'rank_by_pickup_location_and_dropoff_location.csv')
 
 # List of location ids
 taxi_zones_id = list(row[location_id_property] for index, row in taxi_zone_lookup.iterrows())
@@ -211,7 +223,5 @@ for index, row in dataset.iterrows():
                weight=row[count_property], cluster=row[clustering_class_property])
 
 # Saving graph in a format readable by Cytoscape
-nx.write_graphml(G, dataset_folder + 'traffic_graph.graphml')
-
-
+nx.write_graphml(G, results_folder + 'traffic_graph.graphml')
 

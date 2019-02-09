@@ -9,7 +9,8 @@
 
 
 Authors: Willi Menapace <willi.menapace@studenti.unitn.it>
-         Luca Zanells <luca.zanella-3@studenti.unitn.it>
+         Luca Zanella <luca.zanella-3@studenti.unitn.it>
+         Daniele Giuliani <daniele.giuliani@studenti.unitn.it>
 
 Core utilities for data analysis
 '''
@@ -1017,6 +1018,7 @@ def compute_rank_by_pickup_location_and_dropoff_location(dataset, result_filenam
         dataset = dataset.groupBy(pickup_location_id_property, dropoff_location_id_property,
                                   clustering_class_property).count()
 
+    dataset = dataset.filter(dataset[pickup_location_id_property] != dataset[dropoff_location_id_property])
     window = Window.partitionBy(dataset[pickup_location_id_property]).orderBy(dataset['count'].desc())
     dataset = dataset.select('*', rank().over(window).alias('rank'))
 

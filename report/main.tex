@@ -21,7 +21,7 @@
 
 \title{Understanding the NYC Taxi Service}
 
-\numberofauthors{2}
+\numberofauthors{3}
 
 \author{
 	Willi Menapace\\
@@ -31,6 +31,10 @@
 	Luca Zanella\\
 	\texttt{207520}\\
 	\texttt{luca.zanella-3@studenti.unitn.it}
+	\and
+	Daniele Giuliani\\
+	\texttt{207520}\\
+	\texttt{daniele.giuliani@studenti.unitn.it}
 }
 
 %Intro
@@ -134,8 +138,8 @@ The first phase of the analysis is the study of the domain. The New York taxi se
 
 \begin{figure}
 	\centering
-	\includegraphics{resources/boroughsMap.jpg}
-	\caption{The five boroughs of New York. Notice the position of the three airports: LaGuardia, JFK and Newark.}
+	\includegraphics[width=1\columnwidth]{resources/nyc_borough_map.png}
+	\caption{The five boroughs of New York. Notice the position of the three airports: LaGuardia, JFK and Newark. Courtesy of https://nycmap360.com}
 	\label{fig:boroughsMap}
 \end{figure}
 
@@ -188,7 +192,7 @@ The analysis starts with a high level, exploration of the data. As shown in \cre
 \begin{figure}
 	\centering
 	\includegraphics[width=1\columnwidth]{resources/base_plots/pickup_vs_dropoff.png}
-	\caption{Map showing pickups points in green and dropoff points in red. Notice how dropoff points are granularly distributed across every street, while pickup points concentrate in Manhattan and on the main streets, meaning that people need to move to major roads in order to find taxis. Looking closely, it can also be noted that the most blurry areas, South of Central Park and Southest part of Manhattan, which correspond to high GPS error area, are the ones which indeed have the highest concentration of tall buildings.}
+	\caption{Map showing pickups points in green and dropoff points in red. Notice how dropoff points are granularly distributed across every street, while pickup points concentrate in Manhattan and on the main streets, meaning that people need to move to major roads in order to find taxis. Looking closely, it can also be noted that the most blurry areas, South of Central Park and Southest part of Manhattan, which correspond to high GPS error area, are the ones which indeed have the highest concentration of tall buildings. For the high resolution version see \cref{sec:shared_folder}}
 	\label{fig:pickupDropoffImageMap}
 \end{figure}
 
@@ -470,7 +474,7 @@ By analyzing \cref{fig:tripDistanceByCompany} we also note that, while the distr
 \begin{figure}
 	\centering
 	\includegraphics[width=1\columnwidth]{resources/base_plots/yellow_vs_green_pickup.png}
-	\caption{Pickup points of yellow and green taxis in their respective color. Notice how Manhattan and the airports feature yellow prevalence, while the other zones feature a green prevalence.}
+	\caption{Pickup points of yellow and green taxis in their respective color. Notice how Manhattan and the airports feature yellow prevalence, while the other zones feature a green prevalence. For the high resolution version see \cref{sec:shared_folder}}
 	\label{fig:companyDivisionImageMap}
 \end{figure}
 
@@ -549,36 +553,43 @@ Further topics of interest which have not been analyzed at the moment include a 
 \appendix
 %Appendix A
 \section{Files and Script Execution}
+\label{sec:shared_folder}
 
-This appendix describes the contents of the code repository and describes what is needed in order to run the scripts.
+This appendix describes the contents of the shared Google Drive directory and describes what is needed in order to run the scripts. The directory is composed of the following parts
 
-The code repository is composed of the following parts:
+\begin{itemize}
+	\item \texttt{src} folder, containing the Python and R sources
+	\item \texttt{report} folder, containing the files used to produce the report
+	\item \texttt{data} folder, containing the dataset and some helper files for faster dataset construction
+	\item \texttt{plots} folder, containing all the obtained plots and the high resolution version of images shown in the report
+	\item \texttt{spark\_results} folder, containing all the \texttt{.csv} results produced by Spark
+\end{itemize}
+
+The src folder is composed of the following parts:
 
 \begin{itemize}
 	\item Spark Python files in the root directory
 	\item R scripts for the production of plots and additional data analysis in the R folder
-	\item Report files for the production of the current document in the report directory
 	\item Docs and additional material in the docs directory
 \end{itemize}
 
-Moreover the shared Google Drive directory contains the following elements:
+The dataset folder contains the following elements:
 
 \begin{itemize}
-	\item \texttt{.tar.gz} compressed dataset from 2010 to 2018 for yellow and green taxis 
+	\item \texttt{tar\_gz\_dataset} folder, containing the compressed dataset from 2010 to 2018 for yellow and green taxis 
 	\item \texttt{clustering\_model.model} precomputed clustering model
+	\item \texttt{clustered\_dataset.parquet} precomputed dataset, ready for the analysis
 	\item \texttt{daily\_trips\_by\_geography.csv} public archive from toddwschneider containing aggregate information about for hire vehicle operations in New York City
-	\item \texttt{stats.zip}, \texttt{clustered\_stats.zip}, \texttt{airport\_stats.zip}, the data statistics produced by running the Spark scripts on the dataset.
-	\item \texttt{plots.zip}, \texttt{clustered\_plots.zip}, \texttt{airport\_plots.zip}, the plots resulting from running R on Spark results.
 \end{itemize}
 
-In order to obtain the results presented in the record the following steps must be carried out in this order:
+In order to obtain from scratch the results presented in the report, the following steps must be carried out in this order, but you may use intermediate results to speed up the process if you wish to, as described later in this section:
 
 \begin{itemize}
 	\item Install Python packages \texttt{matplotlib}, \texttt{numpy}, \texttt{pandas}, \texttt{networkx}, \texttt{fiona}, \texttt{shapely}.
 	\item Import the compressed .tar.gz dataset in your cluster infrastructure and convert it in parquet format executing the gz\_to\_parquet\_main.py script. The script needs to be configured as described in its header.
 	\item Convert the different dataset years into a dataset with common schema using the \path{common_schema_conversion_main.py} script. The script needs to be configured as described in its header. In particular you need to ensure that the shapefile in the docs folder is available to the main script. Having the \path{lookup_matrix_1000_3.npy} precomputed lookup matrix in the same folder as the python script avoids its recalculation.
 	\item Perform data cleaning by executing \path{data_cleaning_main.py} in order to produce the cleaned dataset. Follow the instruction in the script header to configure it before execution.
-	\item Perform clustering. The full clustering procedure is the longest and most expensive part of the processing. For this reason we provide the precomputed \path{clustering_model.model} precomputed clustering model along with the dataset. If you insert it in the dataset folder you can comment the lines in the code performing clustering and model saving and direct apply the clustering model to your dataset, producing the clustered dataset. Please refer to the file header to correctly configure your script. If you wish to execute the complete clustering procedure, you may execute the script directly after the required parameters are inserted without commenting out portions of the code.
+	\item Perform clustering. The full clustering procedure is the longest and most expensive part of the processing. For this reason we provide the precomputed \path{clustering_model.model} precomputed clustering model along with the dataset. If you insert it in the dataset folder you can comment the lines in the code performing clustering and model saving and direct apply the clustering model to your dataset, producing the clustered dataset. You may also skip the passages until this point by obtaining the \path{clustered_dataset.parquet} dataset from the Google Drive folder. Please refer to the file header to correctly configure your script. If you wish to execute the complete clustering procedure, you may execute the script directly after the required parameters are inserted without commenting out portions of the code.
 	\item Obtain the main data statistics by executing \path{data_statistics_main.py}. Please refer to the header file for correct script configuration. The results in form of .csv files can be subsequently used by the R scripts.
 	\item Obtain the clustered data statistics by executing the same script, but setting \texttt{clustered\_analysis} to True. Remember to save the results in a different folder in order to be able to import them in R more easily in later steps.
 	\item Obtain the airport statistics by executing \path{airport_data_statistics_main.py}. Please refer to the header file for correct script configuration.
@@ -592,7 +603,7 @@ In order to obtain the results presented in the record the following steps must 
 
 It may be possible that some other minor steps or slight modification to the code (such as specifying file access protocols \path{hdfs:\\} instead of \path{file:\\}) are required in order to completely run the code on the system of the reader.
 
-If you are interested only in seeing the result .csv files or in running the R scripts to produce the plots you can avoid running Spark entirely and use the \texttt{stats.zip}, \texttt{clustered\_stats.zip} and \texttt{airport\_stats.zip} archives available in the Google Drive folder to obtain the results of Spark elaborations. If you are interested only in seeing the plots you can download the corresponding zip archives from the Google Drive folder.
+If you are interested only in seeing the result \texttt{.csv} files or in running the R scripts to produce the plots you can avoid running Spark entirely and use the \texttt{stats.zip}, \texttt{clustered\_stats.zip} and \texttt{airport\_stats.zip} archives available in the Google Drive folder to obtain the results of Spark elaborations. If you are interested only in seeing the plots you can download the corresponding zip archives from the Google Drive folder.
 
 
 
